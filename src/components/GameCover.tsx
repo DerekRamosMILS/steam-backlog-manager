@@ -6,14 +6,15 @@ import {
   ViewStyle,
   StyleProp,
   ActivityIndicator,
+  DimensionValue,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../hooks/useAppContext';
 
 interface GameCoverProps {
   uri: string;
-  width?: number;
-  height?: number;
+  width?: DimensionValue;
+  height?: DimensionValue;
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }

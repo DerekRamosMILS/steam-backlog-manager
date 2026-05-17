@@ -1,29 +1,34 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  StatusBar,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useGames } from '../../src/hooks/useGames';
-import { StatCard } from '../../src/components/StatCard';
-import { GlassCard } from '../../src/components/GlassCard';
-import { SectionHeader } from '../../src/components/SectionHeader';
-import { formatBacklogHours } from '../../src/utils/formatters';
-import { useAppContext } from '../../src/hooks/useAppContext';
-import { t, Language } from '../../src/i18n';
-import { BacklogStats, Game } from '../../src/types';
-import { getAllSettings } from '../../src/database/queries';
+import { useGames } from '../hooks/useGames';
+import { formatBacklogHours } from '../utils/formatters';
+import { useAppContext } from '../hooks/useAppContext';
+import { t, Language } from '../i18n';
+import { BacklogStats, Game } from '../types';
+import { getAllSettings } from '../database/queries';
+import { calculateCompletionTimeline } from '../services/plannerService';
+import { ED, edStyles, MONO_FONT, STATUS_COLORS } from '../styles/editorial';
 
-const DAILY_PLAY_SCENARIOS = [1, 2, 3];
+const DAILY_SCENARIOS: { v: string; h: number; sub: string }[] = [
+  { v: '1h', h: 1, sub: 'casual' },
+  { v: '2h', h: 2, sub: 'regular' },
+  { v: '4h', h: 4, sub: 'heavy' },
+  { v: '8h', h: 8, sub: 'extreme' },
+];
 
-export default function StatsScreen() {
-  const { themeColors, language } = useAppContext();
+export default function InsightsScreen() {
+  const { language } = useAppContext();
   const { games, stats, refresh } = useGames();
+  const [planHours, setPlanHours] = useState(2);
 
   useFocusEffect(
     useCallback(() => {
@@ -31,283 +36,354 @@ export default function StatsScreen() {
     }, [refresh])
   );
 
-  const completionRate =
-    stats && stats.total > 0
-      ? Math.round((stats.completed / stats.total) * 100)
-      : 0;
-
-  const backlogRate =
-    stats && stats.total > 0
-      ? Math.round(((stats.total - stats.completed) / stats.total) * 100)
-      : 0;
-
-  const statusBreakdown = stats
-    ? [
-      { label: t('stats_playing', language), value: stats.playing, color: themeColors.green },
-      { label: t('stats_up_next', language), value: stats.up_next, color: themeColors.blue },
-      { label: t('stats_paused', language), value: stats.paused, color: themeColors.violet },
-      { label: t('stats_completed', language), value: stats.completed, color: themeColors.accent },
-      { label: t('stats_abandoned', language), value: stats.abandoned, color: themeColors.red },
-      { label: t('stats_not_started', language), value: stats.not_started, color: themeColors.textMuted },
-    ]
-    : [];
-
-  const realisticBacklog = stats
-    ? DAILY_PLAY_SCENARIOS.map((hoursPerDay) => ({
-      hoursPerDay,
-      label: formatBacklogDuration(stats.total_hours_remaining, hoursPerDay, language),
-    }))
-    : [];
-
-  const shame = stats ? computeShame(stats) : 0;
-  const shameVerdict = stats ? getShameVerdict(shame, stats.total_hours_remaining, language) : '';
-  const shameBar = stats ? shameBarStr(shame) : '';
-
   const { currency } = getAllSettings();
-  const libValue = computeLibraryValue(games);
   const currencySymbol = currency.toUpperCase() === 'MXN' ? 'MX$' : '$';
 
-  return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={[themeColors.bg, themeColors.card]}
-        style={StyleSheet.absoluteFill}
-      />
+  const completionRate = stats && stats.total > 0
+    ? Math.round((stats.completed / stats.total) * 100) : 0;
+  const backlogRate = stats && stats.total > 0
+    ? Math.round(((stats.total - stats.completed) / stats.total) * 100) : 0;
+  const hitRate = stats && (stats.completed + stats.abandoned) > 0
+    ? Math.round((stats.completed / (stats.completed + stats.abandoned)) * 100) : 0;
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('stats_title', language)}</Text>
-          <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>{t('stats_subtitle', language)}</Text>
+  const shame = stats ? computeShame(stats) : 0;
+  const shameVerdict = stats ? getShameVerdict(shame, stats.total_hours_remaining, language as Language) : '';
+  const shameDiagnosis = stats ? getShameDiagnosis(shame, stats, language as Language) : '';
+
+  const libValue = computeLibraryValue(games);
+
+  const plan = calculateCompletionTimeline(planHours);
+  const planYears = plan.monthsToComplete / 12;
+  const planDays = Math.round(plan.monthsToComplete * 30.44);
+  const planDate = plan.estimatedDate;
+  const planDateStr = planDate.toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+
+  const statusBreakdown = stats ? [
+    { label: 'Not started', value: stats.not_started, color: ED.ink4 },
+    { label: 'Up Next', value: stats.up_next, color: ED.sky },
+    { label: 'Playing', value: stats.playing, color: ED.moss },
+    { label: 'Paused', value: stats.paused, color: ED.amber },
+    { label: 'Completed', value: stats.completed, color: ED.plum },
+    { label: 'Abandoned', value: stats.abandoned, color: ED.rust },
+  ] : [];
+
+  return (
+    <View style={s.root}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <Text style={[edStyles.eyebrow, { marginBottom: 6 }]}>YOUR BACKLOG · IN NUMBERS</Text>
+          <Text style={[edStyles.displayTitle, { fontSize: 38 }]}>Insights.</Text>
         </View>
 
-        {/* Big stats */}
-        {stats && (
+        {stats ? (
           <>
-            {/* Backlog countdown */}
-            <GlassCard style={styles.countdown} padding={20}>
-              <LinearGradient
-                colors={[themeColors.accent + '25', themeColors.orange + '10']}
-                style={StyleSheet.absoluteFill}
-              />
-              <Ionicons name="hourglass" size={28} color={themeColors.orange} />
-              <Text style={[styles.countdownHours, { color: themeColors.textPrimary }]}>
-                {formatBacklogHours(stats.total_hours_remaining)}
-              </Text>
-              <Text style={[styles.countdownLabel, { color: themeColors.textSecondary }]}>{t('stats_countdown_label', language)}</Text>
-            </GlassCard>
+            {/* ── Planner ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={[edStyles.eyebrow, { color: ED.copper }]}>◆ Planner</Text>
+              </View>
 
-            <View style={styles.section}>
-              <SectionHeader
-                title={t('stats_realistic_pace', language)}
-                icon="calendar"
-                iconColor={themeColors.orange}
-              />
-              <GlassCard padding={16}>
-                {realisticBacklog.map((item) => (
-                  <View key={item.hoursPerDay} style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
-                    <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>{`${t('stats_at_per_day', language)} ${item.hoursPerDay}${t('stats_per_day', language)}`}</Text>
-                    <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{item.label}</Text>
+              <View style={edStyles.card}>
+                <View style={{ padding: 20 }}>
+                  <Text style={[edStyles.eyebrow, { marginBottom: 12 }]}>If you play</Text>
+                  <View style={s.planBtns}>
+                    {DAILY_SCENARIOS.map((sc) => {
+                      const active = planHours === sc.h;
+                      return (
+                        <TouchableOpacity
+                          key={sc.v}
+                          style={[s.planBtn, active && s.planBtnActive]}
+                          onPress={() => setPlanHours(sc.h)}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[s.planBtnVal, active && s.planBtnValActive]}>{sc.v}</Text>
+                          <Text style={[s.planBtnSub, active && s.planBtnSubActive]}>{sc.sub}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                ))}
-              </GlassCard>
-            </View>
 
-            {/* Four stat cards */}
-            <View style={styles.row}>
-              <StatCard
-                label={t('stats_total_games', language)}
-                value={stats.total}
-                icon="library"
-                color={themeColors.accent}
-              />
-              <StatCard
-                label={t('stats_playtime', language)}
-                value={`${stats.total_playtime_hours}h`}
-                icon="game-controller"
-                color={themeColors.teal}
-              />
-            </View>
-            <View style={[styles.row, { marginTop: 10 }]}>
-              <StatCard
-                label={t('stats_completed_pct', language)}
-                value={`${completionRate}%`}
-                icon="checkmark-circle"
-                color={themeColors.violet}
-                subtitle={`${stats.completed} ${t('stats_of', language)} ${stats.total}`}
-              />
-              <StatCard
-                label={t('stats_backlog_pct', language)}
-                value={`${backlogRate}%`}
-                icon="archive"
-                color={themeColors.red}
-                subtitle={`${stats.total - stats.completed} ${t('stats_remaining', language)}`}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <SectionHeader
-                title={t('stats_hltb_progress', language)}
-                icon="checkmark-done-circle"
-                iconColor={themeColors.green}
-              />
-              <GlassCard padding={16}>
-                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
-                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>{t('stats_hltb_met', language)}</Text>
-                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{`${stats.hltb_target_met} ${t('stats_games', language)}`}</Text>
-                </View>
-                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
-                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>{t('stats_hltb_ready', language)}</Text>
-                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{`${stats.hltb_ready_to_finish} ${t('stats_games', language)}`}</Text>
-                </View>
-                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
-                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>{t('stats_hltb_excluded', language)}</Text>
-                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{`${stats.excluded_from_backlog} ${t('stats_games', language)}`}</Text>
-                </View>
-              </GlassCard>
-            </View>
-
-            {/* Status breakdown */}
-            <View style={styles.section}>
-              <SectionHeader
-                title={t('stats_by_status', language)}
-                icon="pie-chart"
-                iconColor={themeColors.accent}
-              />
-              <GlassCard padding={16}>
-                {statusBreakdown.map((item) => (
-                  <View key={item.label} style={styles.breakdownRow}>
-                    <View style={[styles.dot, { backgroundColor: item.color }]} />
-                    <Text style={[styles.breakdownLabel, { color: themeColors.textSecondary }]}>{item.label}</Text>
-                    <View style={[styles.breakdownBarWrap, { backgroundColor: themeColors.glassBorder }]}>
-                      <View
-                        style={[
-                          styles.breakdownBar,
-                          {
-                            width: stats.total > 0
-                              ? `${Math.round((item.value / stats.total) * 100)}%` as any
-                              : '0%',
-                            backgroundColor: item.color,
-                          },
-                        ]}
-                      />
+                  {/* Big number */}
+                  <View style={s.planResult}>
+                    <Text style={[edStyles.eyebrow, { marginBottom: 10 }]}>You'd clear your backlog in</Text>
+                    <View style={s.planYearRow}>
+                      <Text style={s.planYearNum}>{planYears.toFixed(2)}</Text>
+                      <Text style={s.planYearLabel}>years</Text>
                     </View>
-                    <Text style={[styles.breakdownValue, { color: item.color }]}>
-                      {item.value}
+                    <Text style={s.planSub}>
+                      <Text style={[s.planMono]}>{planDays} days</Text>
+                      {'  ·  finishing '}
+                      <Text style={s.planMono}>{planDateStr}</Text>
                     </Text>
                   </View>
-                ))}
-              </GlassCard>
+
+                  {/* Mini timeline bar */}
+                  <View style={{ marginTop: 20 }}>
+                    <View style={s.timelineBar}>
+                      {statusBreakdown.filter(b => ['Not started', 'Up Next', 'Playing', 'Paused'].includes(b.label)).map((b, i, arr) => (
+                        <View
+                          key={b.label}
+                          style={[
+                            s.timelineSegment,
+                            {
+                              flex: b.value,
+                              backgroundColor: b.color,
+                              borderRightWidth: i < arr.length - 1 ? 1 : 0,
+                            },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                    <View style={s.timelineLabels}>
+                      {['TODAY', 'HALFWAY', planDateStr.toUpperCase()].map((l) => (
+                        <Text key={l} style={s.timelineLabel}>{l}</Text>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              </View>
             </View>
 
-            {/* Library Value */}
-            {libValue.countWithPrice > 0 && (
-              <View style={styles.section}>
-                <SectionHeader
-                  title={t('lbl_library_value' as any, language)}
-                  icon="cash"
-                  iconColor={themeColors.green}
-                />
-                <GlassCard padding={20} borderColor={themeColors.green + '44'} style={{ overflow: 'hidden' }}>
-                  <LinearGradient
-                    colors={[themeColors.green + '14', 'transparent']}
-                    style={StyleSheet.absoluteFill}
+            {/* ── Hero stats ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>At a glance</Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={[edStyles.card, s.heroCardLg]}>
+                  <Text style={edStyles.eyebrow}>Hours to clear</Text>
+                  <View style={s.bigNumRow}>
+                    <Text style={s.bigNum}>{Math.round(stats.total_hours_remaining)}</Text>
+                    <Text style={s.bigNumUnit}>h</Text>
+                  </View>
+                  <Text style={s.heroCardSub}>HLTB main story estimates</Text>
+                </View>
+                <View style={[edStyles.card, s.heroCardSm]}>
+                  <Text style={edStyles.eyebrow}>Played</Text>
+                  <View style={s.bigNumRow}>
+                    <Text style={[s.bigNum, { fontSize: 32 }]}>{stats.total_playtime_hours}</Text>
+                    <Text style={s.bigNumUnit}>h</Text>
+                  </View>
+                  <Text style={s.heroCardSub}>across {stats.total} titles</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                {[
+                  { label: 'Completion', value: completionRate, unit: '%' },
+                  { label: 'Backlog', value: backlogRate, unit: '%' },
+                  { label: 'Hit rate', value: hitRate, unit: '%' },
+                ].map((stat) => (
+                  <View key={stat.label} style={[edStyles.card, s.thirdCard]}>
+                    <Text style={edStyles.eyebrow}>{stat.label}</Text>
+                    <View style={s.bigNumRow}>
+                      <Text style={[s.bigNum, { fontSize: 28 }]}>{stat.value}</Text>
+                      <Text style={[s.bigNumUnit, { fontSize: 14 }]}>{stat.unit}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* ── Status breakdown ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>Status breakdown</Text>
+                <Text style={[edStyles.eyebrow, { color: ED.ink3, fontFamily: MONO_FONT }]}>{stats.total} TOTAL</Text>
+              </View>
+
+              {/* Stacked bar */}
+              <View style={s.stackedBar}>
+                {statusBreakdown.map((b) => (
+                  <View
+                    key={b.label}
+                    style={[s.stackedSegment, {
+                      flex: b.value || 0.01,
+                      backgroundColor: b.color,
+                    }]}
                   />
-                  <Text style={[styles.shameLevelLabel, { color: themeColors.textMuted }]}>
-                    {t('share_total' as any, language)}: {libValue.countWithPrice}
-                  </Text>
+                ))}
+              </View>
 
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: currency === 'mxn' ? 28 : 44, fontWeight: '900', color: themeColors.green, letterSpacing: -1 }}>
-                      {currencySymbol}{(libValue.totalCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: currency === 'mxn' ? 0 : 2 })}
+              <View style={edStyles.card}>
+                {statusBreakdown.map((item, idx) => (
+                  <View
+                    key={item.label}
+                    style={[
+                      s.breakdownRow,
+                      idx < statusBreakdown.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
+                    ]}
+                  >
+                    <View style={[s.breakdownDot, { backgroundColor: item.color }]} />
+                    <Text style={s.breakdownLabel}>{item.label}</Text>
+                    <Text style={s.breakdownPct}>
+                      {stats.total > 0 ? ((item.value / stats.total) * 100).toFixed(0) : 0}%
                     </Text>
+                    <Text style={[s.breakdownVal, { color: item.color }]}>{item.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* ── Shame meter ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>The Backlog Mirror</Text>
+                <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>SHAME METER</Text>
+              </View>
+
+              <View style={edStyles.card}>
+                <View style={{ padding: 20 }}>
+                  <View style={s.shameHeader}>
+                    <View>
+                      <View style={s.shameNumRow}>
+                        <Text style={[s.shameNum, { color: shame > 80 ? ED.rust : ED.copper }]}>{shame}</Text>
+                        <Text style={s.shameNumDenom}>/100</Text>
+                      </View>
+                    </View>
+                    <View style={s.shameVerdictBox}>
+                      <Text style={[s.shameVerdictTitle, { color: shame > 80 ? ED.rust : ED.amber }]}>
+                        {shame > 80 ? 'Concerning.' : shame > 55 ? 'Oof.' : shame > 30 ? 'Room to grow.' : 'Clean slate.'}
+                      </Text>
+                      <Text style={s.shameVerdictSub}>{shameVerdict.split('\n')[0]}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.verdictBox}>
-                    <Text style={[styles.verdictLabel, { color: themeColors.green }]}>{t('share_hours_per_dollar' as any, language)}</Text>
-                    <Text style={[styles.verdictText, { color: themeColors.textPrimary }]}>
-                      {libValue.hoursPerUnit.toFixed(2)} {t('share_hours' as any, language)} / {currencySymbol}1
+                  {/* Gradient bar */}
+                  <View style={s.shameBarTrack}>
+                    <View style={s.shameBarFill} />
+                    <View style={[s.shameBarMarker, { left: `${shame}%` as any }]} />
+                  </View>
+                  <View style={s.shameBarLabels}>
+                    {['SAINT', 'HEALTHY', 'RECKONING'].map((l) => (
+                      <Text key={l} style={s.shameBarLabel}>{l}</Text>
+                    ))}
+                  </View>
+
+                  {/* Diagnosis */}
+                  <View style={s.diagnosisCard}>
+                    <Text style={s.diagnosisLabel}>DIAGNOSIS</Text>
+                    <Text style={s.diagnosisText}>{shameDiagnosis}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ── Reality check ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>Reality check</Text>
+              </View>
+              <View style={edStyles.card}>
+                {DAILY_SCENARIOS.map((sc, idx) => {
+                  const sim = calculateCompletionTimeline(sc.h);
+                  const isSelected = planHours === sc.h;
+                  return (
+                    <TouchableOpacity
+                      key={sc.v}
+                      style={[
+                        s.realityRow,
+                        idx < DAILY_SCENARIOS.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
+                        isSelected && { backgroundColor: ED.copperBg },
+                      ]}
+                      onPress={() => setPlanHours(sc.h)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.realityHours, isSelected && { color: ED.copper }]}>{sc.v}/d</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.realityVerdict, isSelected && { color: ED.copper }]}>
+                          {formatBacklogDuration(stats.total_hours_remaining, sc.h, language as Language)}
+                        </Text>
+                        <Text style={s.realitySub}>{sc.sub}</Text>
+                      </View>
+                      {isSelected && (
+                        <View style={s.youPill}>
+                          <Text style={s.youPillText}>YOU</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Library value ── */}
+            {libValue.countWithPrice > 0 && (
+              <View style={s.section}>
+                <View style={edStyles.sectionHead}>
+                  <Text style={edStyles.eyebrow}>Library value</Text>
+                  <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>{currency.toUpperCase()} ESTIMATES</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[edStyles.card, s.valueCard]}>
+                    <Text style={edStyles.eyebrow}>Spent</Text>
+                    <Text style={[s.valueNum, { color: ED.ink }]}>
+                      {currencySymbol}{Math.round(libValue.totalCents / 100).toLocaleString()}
                     </Text>
+                    <Text style={s.valueSub}>across all stores</Text>
                   </View>
-
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <View style={[styles.verdictBox, { flex: 1, marginBottom: 0 }]}>
-                      <Text style={[styles.verdictLabel, { color: themeColors.green }]}>{t('share_avg_price' as any, language)}</Text>
-                      <Text style={[styles.verdictText, { color: themeColors.textPrimary }]}>
-                        {currencySymbol}{(libValue.averageCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: currency === 'mxn' ? 0 : 2 })}
-                      </Text>
-                    </View>
-                    <View style={[styles.verdictBox, { flex: 1, marginBottom: 0 }]}>
-                      <Text style={[styles.verdictLabel, { color: themeColors.green }]}>{t('share_most_exp' as any, language)}</Text>
-                      <Text style={[styles.verdictText, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                        {libValue.mostExpAppName}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: themeColors.textMuted, marginTop: 4 }}>
-                        {currencySymbol}{(libValue.mostExpCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: currency === 'mxn' ? 0 : 2 })}
-                      </Text>
-                    </View>
+                  <View style={[edStyles.card, s.valueCard]}>
+                    <Text style={edStyles.eyebrow}>Avg price</Text>
+                    <Text style={[s.valueNum, { color: ED.moss }]}>
+                      {currencySymbol}{Math.round(libValue.averageCents / 100).toLocaleString()}
+                    </Text>
+                    <Text style={s.valueSub}>{libValue.countWithPrice} titles tracked</Text>
                   </View>
-
-                  <Text style={[styles.shameHint, { color: themeColors.textMuted }]}>
-                    💰 BacklogFlow Library Report
-                  </Text>
-                </GlassCard>
+                </View>
+                <View style={[edStyles.card, { marginTop: 10 }]}>
+                  <View style={{ padding: 16 }}>
+                    <Text style={edStyles.eyebrow}>Hours / {currencySymbol}1</Text>
+                    <Text style={[s.valueNum, { color: ED.copper, fontSize: 28, marginTop: 4 }]}>
+                      {libValue.hoursPerUnit.toFixed(2)}h
+                    </Text>
+                    <Text style={s.valueSub}>Most expensive: {libValue.mostExpAppName} ({currencySymbol}{Math.round(libValue.mostExpCents / 100)})</Text>
+                  </View>
+                </View>
               </View>
             )}
 
-            {/* Backlog Shame Meter */}
-            <View style={styles.section}>
-              <SectionHeader
-                title={t('shame_section_title', language)}
-                icon="flame"
-                iconColor="#ff4500"
-              />
-              <GlassCard padding={20} borderColor="#ff450044" style={{ overflow: 'hidden' }}>
-                <LinearGradient
-                  colors={['#ff430014', 'transparent']}
-                  style={StyleSheet.absoluteFill}
-                />
-                {/* Level label + bar */}
-                <Text style={[styles.shameLevelLabel, { color: themeColors.textMuted }]}>
-                  {t('shame_level_label', language)}
-                </Text>
-                <Text style={styles.shameBarChars}>{shameBar}</Text>
-                <Text style={styles.shamePct}>{shame}%</Text>
-
-                {/* Verdict box */}
-                <View style={styles.verdictBox}>
-                  <Text style={styles.verdictLabel}>{t('shame_verdict_label', language)}</Text>
-                  <Text style={[styles.verdictText, { color: themeColors.textPrimary }]}>
-                    {shameVerdict}
-                  </Text>
-                </View>
-
-                <Text style={[styles.shameHint, { color: themeColors.textMuted }]}>
-                  🔥 {t('shame_share_btn', language)}
-                </Text>
-              </GlassCard>
+            {/* ── HLTB data ── */}
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>HLTB progress</Text>
+              </View>
+              <View style={edStyles.card}>
+                {[
+                  { label: 'Target met', value: stats.hltb_target_met },
+                  { label: 'Ready to finish', value: stats.hltb_ready_to_finish },
+                  { label: 'Excluded from backlog', value: stats.excluded_from_backlog },
+                ].map((row, idx, arr) => (
+                  <View
+                    key={row.label}
+                    style={[edStyles.specRow, idx === arr.length - 1 && { borderBottomWidth: 0 }]}
+                  >
+                    <Text style={edStyles.specKey}>{row.label}</Text>
+                    <Text style={edStyles.specVal}>{row.value} games</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </>
-        )}
-
-        {!stats && (
-          <View style={styles.empty}>
-            <Ionicons name="bar-chart-outline" size={48} color={themeColors.textMuted} />
-            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>{t('stats_no_data', language)}</Text>
-            <Text style={[styles.emptySubText, { color: themeColors.textMuted }]}>
-              {t('stats_no_data_sub', language)}
-            </Text>
+        ) : (
+          <View style={s.empty}>
+            <Ionicons name="bar-chart-outline" size={48} color={ED.ink4} />
+            <Text style={s.emptyTitle}>No data yet</Text>
+            <Text style={s.emptySubText}>Add games to your library to see insights</Text>
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function computeLibraryValue(games: Game[]) {
   let totalCents = 0;
@@ -325,8 +401,6 @@ function computeLibraryValue(games: Game[]) {
         mostExpAppName = g.title;
       }
     }
-    // Only count playtime for paid games (cents > 0) to get accurate hours/dollar
-    // Alternatively, just count playtime for all games that DO have a price entry 
     if (g.price_cents !== null && g.price_cents !== undefined && g.price_cents >= 0) {
       totalMinutes += g.playtime_minutes;
     }
@@ -334,7 +408,6 @@ function computeLibraryValue(games: Game[]) {
 
   const hoursPerUnit = totalCents > 0 ? (totalMinutes / 60) / (totalCents / 100) : 0;
   const averageCents = countWithPrice > 0 ? totalCents / countWithPrice : 0;
-
   return { totalCents, averageCents, mostExpAppName, mostExpCents, hoursPerUnit, countWithPrice };
 }
 
@@ -355,9 +428,9 @@ function getShameVerdict(shame: number, hoursRemaining: number, lang: Language):
     { min: 20, en: 'A healthy backlog.\nA lie you tell yourself.', es: 'Un backlog saludable.\nUna mentira que te dices.' },
     { min: 40, en: 'The backlog grows.\nSteam sales were a mistake.', es: 'El backlog crece.\nLas ofertas de Steam fueron un error.' },
     { min: 55, en: 'Certified game hoarder.', es: 'Acumulador certificado de juegos.' },
-    { min: 68, en: "Your backlog is a\nsmall country's GDP.", es: 'Tu backlog equivale\nal PIB de un país pequeño.' },
-    { min: 80, en: `You could finish your backlog\nin ${finishYear}. Good luck.`, es: `Podrías terminar tu backlog\nen ${finishYear}. Buena suerte.` },
-    { min: 92, en: 'Steam therapist recommended.\nImmediately.', es: 'Se recomienda terapeuta de Steam.\nInmediatamente.' },
+    { min: 68, en: "Your backlog is a small country's GDP.", es: 'Tu backlog equivale al PIB de un país pequeño.' },
+    { min: 80, en: `Finish your backlog in ${finishYear}. Good luck.`, es: `Termina tu backlog en ${finishYear}. Buena suerte.` },
+    { min: 92, en: 'Steam therapist recommended. Immediately.', es: 'Se recomienda terapeuta de Steam. Inmediatamente.' },
   ];
   let verdict = tiers[0];
   for (const tier of tiers) {
@@ -366,157 +439,148 @@ function getShameVerdict(shame: number, hoursRemaining: number, lang: Language):
   return lang === 'es' ? verdict.es : verdict.en;
 }
 
-function shameBarStr(shame: number): string {
-  const filled = Math.round(shame / 5);
-  return '█'.repeat(Math.max(0, filled)) + '░'.repeat(Math.max(0, 20 - filled));
+function getShameDiagnosis(shame: number, stats: BacklogStats, lang: Language): string {
+  const untouched = stats.not_started;
+  const tiers: Array<{ min: number; en: string; es: string }> = [
+    { min: 0, en: `Clean collection. Only ${untouched} untouched titles. Respect.`, es: `Colección limpia. Solo ${untouched} sin tocar. Respeto.` },
+    { min: 25, en: `Mild hoarding detected. ${untouched} games untouched. Manageable.`, es: `Acumulación leve detectada. ${untouched} juegos sin tocar. Manejable.` },
+    { min: 45, en: `Chronic sale fever. ${untouched} games untouched. Consider a backlog diet.`, es: `Fiebre crónica de ofertas. ${untouched} juegos sin tocar. Considera una dieta de backlog.` },
+    { min: 65, en: `Critical. ${untouched} games untouched. Recommended treatment: stop visiting Steam on Tuesdays.`, es: `Crítico. ${untouched} juegos sin tocar. Tratamiento: deja de visitar Steam los martes.` },
+    { min: 80, en: `Terminal. ${untouched} unplayed games. A therapist has been notified.`, es: `Terminal. ${untouched} juegos sin jugar. Se ha notificado a un terapeuta.` },
+  ];
+  let chosen = tiers[0];
+  for (const tier of tiers) {
+    if (shame >= tier.min) chosen = tier;
+  }
+  return lang === 'es' ? chosen.es : chosen.en;
 }
 
 function formatBacklogDuration(totalHours: number, hoursPerDay: number, lang: Language): string {
-  if (totalHours <= 0 || hoursPerDay <= 0) {
-    return t('stats_done', lang);
-  }
-
+  if (totalHours <= 0 || hoursPerDay <= 0) return t('stats_done', lang);
   const totalDays = totalHours / hoursPerDay;
   const years = totalDays / 365;
-
-  if (years >= 1) {
-    const roundedYears = Math.round(years * 10) / 10;
-    return `${roundedYears} ${t('stats_years', lang)}`;
-  }
-
+  if (years >= 1) return `${(Math.round(years * 10) / 10)} ${t('stats_years', lang)}`;
   const months = totalDays / 30;
-  if (months >= 1) {
-    const roundedMonths = Math.round(months * 10) / 10;
-    return `${roundedMonths} ${t('stats_months', lang)}`;
-  }
-
+  if (months >= 1) return `${(Math.round(months * 10) / 10)} ${t('stats_months', lang)}`;
   return `${Math.ceil(totalDays)} ${t('stats_days', lang)}`;
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { paddingTop: 60, paddingHorizontal: 20 },
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: ED.bg },
+  scroll: { paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingHorizontal: 24 },
   header: { marginBottom: 24 },
-  title: {
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-  },
-  subtitle: { fontSize: 13, marginTop: 2 },
-  countdown: {
+  section: { marginBottom: 28 },
+
+  // Planner
+  planBtns: { flexDirection: 'row', gap: 6 },
+  planBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: ED.line,
     alignItems: 'center',
-    marginBottom: 20,
-    overflow: 'hidden',
-    gap: 8,
   },
-  countdownHours: {
-    fontSize: 40,
-    fontWeight: '900',
-    letterSpacing: -1,
-    textAlign: 'center',
+  planBtnActive: { backgroundColor: ED.ink, borderColor: ED.ink },
+  planBtnVal: { fontSize: 18, fontWeight: '700', color: ED.ink2, fontFamily: MONO_FONT },
+  planBtnValActive: { color: ED.bg },
+  planBtnSub: { fontSize: 9, color: ED.ink3, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 },
+  planBtnSubActive: { color: ED.bg, opacity: 0.7 },
+  planResult: { alignItems: 'center', paddingVertical: 14 },
+  planYearRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  planYearNum: {
+    fontSize: 80, fontWeight: '900', color: ED.copper,
+    letterSpacing: -3, lineHeight: 86,
   },
-  countdownLabel: {
-    fontSize: 13,
-    textAlign: 'center',
+  planYearLabel: {
+    fontSize: 22, color: ED.ink3, fontStyle: 'italic',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  row: { flexDirection: 'row', gap: 10 },
-  section: { marginTop: 24 },
-  realisticRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+  planSub: { fontSize: 12.5, color: ED.ink3, marginTop: 8 },
+  planMono: { fontFamily: MONO_FONT, color: ED.ink2 },
+  timelineBar: {
+    height: 28, borderRadius: 8, overflow: 'hidden',
+    flexDirection: 'row', backgroundColor: ED.surface3,
   },
-  realisticLabel: {
-    fontSize: 14,
+  timelineSegment: { borderRightColor: 'rgba(0,0,0,0.3)', opacity: 0.85 },
+  timelineLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  timelineLabel: { fontFamily: MONO_FONT, fontSize: 9, color: ED.ink3 },
+
+  // Hero stats
+  heroCardLg: { flex: 2, padding: 18 },
+  heroCardSm: { flex: 1, padding: 18 },
+  thirdCard: { flex: 1, padding: 14 },
+  bigNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 4 },
+  bigNum: { fontSize: 52, fontWeight: '900', color: ED.ink, letterSpacing: -2 },
+  bigNumUnit: { fontSize: 18, color: ED.ink3, fontWeight: '600' },
+  heroCardSub: { fontSize: 10, color: ED.ink3, marginTop: 4, fontFamily: MONO_FONT },
+
+  // Status breakdown
+  stackedBar: {
+    height: 8, borderRadius: 100, overflow: 'hidden',
+    flexDirection: 'row', marginBottom: 14,
+    backgroundColor: ED.surface3,
   },
-  realisticValue: {
-    fontSize: 15,
-    fontWeight: '700',
+  stackedSegment: {},
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px' as any, paddingVertical: 10, paddingHorizontal: 16 },
+  breakdownDot: { width: 10, height: 10, borderRadius: 2 },
+  breakdownLabel: { flex: 1, fontSize: 13.5, color: ED.ink2, fontWeight: '500' },
+  breakdownPct: { fontFamily: MONO_FONT, fontSize: 12, color: ED.ink3 },
+  breakdownVal: { fontSize: 18, fontWeight: '700', width: 40, textAlign: 'right' as const },
+
+  // Shame meter
+  shameHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
+  shameNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
+  shameNum: { fontSize: 56, fontWeight: '900', letterSpacing: -2 },
+  shameNumDenom: { fontSize: 18, color: ED.ink3, fontWeight: '600', fontFamily: MONO_FONT },
+  shameVerdictBox: { flex: 1, paddingLeft: 16, justifyContent: 'center' },
+  shameVerdictTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.5 },
+  shameVerdictSub: { fontSize: 12, color: ED.ink3, marginTop: 3, fontStyle: 'italic' },
+  shameBarTrack: {
+    height: 6, backgroundColor: ED.surface3, borderRadius: 100,
+    marginTop: 14, overflow: 'visible',
   },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+  shameBarFill: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 100, overflow: 'hidden',
+    // Gradient approximated with a linear tint
+    backgroundColor: ED.moss,
   },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  breakdownLabel: {
-    fontSize: 13,
-    width: 90,
+  shameBarMarker: {
+    position: 'absolute', top: -3, width: 2, height: 12,
+    backgroundColor: ED.ink, marginLeft: -1,
   },
-  breakdownBarWrap: {
-    flex: 1,
-    height: 6,
-    borderRadius: 99,
-    overflow: 'hidden',
+  shameBarLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  shameBarLabel: { fontFamily: MONO_FONT, fontSize: 9, color: ED.ink3 },
+  diagnosisCard: {
+    marginTop: 18, padding: 14, borderRadius: 10,
+    backgroundColor: 'rgba(193,104,71,0.08)',
+    borderWidth: 1, borderColor: 'rgba(193,104,71,0.18)',
   },
-  breakdownBar: {
-    height: '100%',
-    borderRadius: 99,
-    minWidth: 4,
-    opacity: 0.8,
+  diagnosisLabel: {
+    fontFamily: MONO_FONT, fontSize: 10, fontWeight: '600',
+    letterSpacing: 1.4, textTransform: 'uppercase',
+    color: ED.rust, marginBottom: 6,
   },
-  breakdownValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    width: 28,
-    textAlign: 'right',
+  diagnosisText: { fontSize: 13, color: ED.ink2, lineHeight: 20 },
+
+  // Reality check
+  realityRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 },
+  realityHours: { fontFamily: MONO_FONT, fontSize: 14, fontWeight: '600', color: ED.ink, width: 42 },
+  realityVerdict: { fontSize: 14, fontWeight: '600', color: ED.ink },
+  realitySub: { fontSize: 11, color: ED.ink3, marginTop: 2 },
+  youPill: {
+    backgroundColor: ED.copper, borderRadius: 4,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { fontSize: 16, fontWeight: '600' },
-  emptySubText: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  // ── Shame Meter ────────────────────────────────────────────
-  shameLevelLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  shameBarChars: {
-    color: '#ff4500',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  shamePct: {
-    color: '#ff6535',
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: -1,
-    marginBottom: 16,
-  },
-  verdictBox: {
-    backgroundColor: 'rgba(255,69,0,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,69,0,0.25)',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-  },
-  verdictLabel: {
-    color: '#ff6535',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  verdictText: {
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 24,
-  },
-  shameHint: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-  },
+  youPillText: { fontFamily: MONO_FONT, fontSize: 9, fontWeight: '700', color: '#1A1108' },
+
+  // Library value
+  valueCard: { flex: 1, padding: 16 },
+  valueNum: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, marginTop: 4 },
+  valueSub: { fontSize: 11, color: ED.ink3, marginTop: 4 },
+
+  // Empty state
+  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: ED.ink },
+  emptySubText: { fontSize: 13, color: ED.ink3, textAlign: 'center' },
 });

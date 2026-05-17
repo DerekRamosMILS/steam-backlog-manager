@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,15 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
-  FlatList,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../hooks/useAppContext';
 import { searchGamesByTitle } from '../services/gameSearchService';
 import { insertManualGame } from '../database/queries';
-import { ManualGameSearchResult, GameStatus, GamePriority, Platform } from '../types';
+import { ManualGameSearchResult, GameStatus, GamePriority, Platform as GamePlatform } from '../types';
 import { t, Language } from '../i18n';
+import { ED, edStyles, MONO_FONT, STATUS_COLORS } from '../styles/editorial';
 
 interface Props {
   visible: boolean;
@@ -25,24 +25,20 @@ interface Props {
   onGameAdded: () => void;
 }
 
-function getStatusOptions(lang: Language): { key: GameStatus; label: string }[] {
-  return [
-    { key: 'not_started', label: t('mgm_status_not_started', lang) },
-    { key: 'up_next', label: t('mgm_status_up_next', lang) },
-    { key: 'playing', label: t('mgm_status_playing', lang) },
-    { key: 'paused', label: t('mgm_status_paused', lang) },
-  ];
-}
+const STATUS_OPTIONS: { key: GameStatus; label: string }[] = [
+  { key: 'not_started', label: 'Not started' },
+  { key: 'up_next', label: 'Up Next' },
+  { key: 'playing', label: 'Playing' },
+  { key: 'paused', label: 'Paused' },
+];
 
-function getPriorityOptions(lang: Language): { key: GamePriority; label: string }[] {
-  return [
-    { key: 'high', label: t('mgm_priority_high', lang) },
-    { key: 'medium', label: t('mgm_priority_medium', lang) },
-    { key: 'low', label: t('mgm_priority_low', lang) },
-  ];
-}
+const PRIORITY_OPTIONS: { key: GamePriority; label: string; color: string }[] = [
+  { key: 'high', label: 'High', color: ED.rust },
+  { key: 'medium', label: 'Med', color: ED.amber },
+  { key: 'low', label: 'Low', color: ED.ink3 },
+];
 
-const PLATFORM_OPTIONS: { key: Platform; label: string }[] = [
+const PLATFORM_OPTIONS: { key: GamePlatform; label: string }[] = [
   { key: 'steam', label: 'Steam' },
   { key: 'gog', label: 'GOG' },
   { key: 'epic', label: 'Epic' },
@@ -53,9 +49,11 @@ const PLATFORM_OPTIONS: { key: Platform; label: string }[] = [
 ];
 
 export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
-  const { themeColors, language } = useAppContext();
+  const { language } = useAppContext();
+  const lang = language as Language;
+
   const [title, setTitle] = useState('');
-  const [platform, setPlatform] = useState<Platform>('other');
+  const [platform, setPlatform] = useState<GamePlatform>('other');
   const [status, setStatus] = useState<GameStatus>('not_started');
   const [priority, setPriority] = useState<GamePriority>('medium');
   const [notes, setNotes] = useState('');
@@ -65,16 +63,10 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const STATUS_OPTIONS = getStatusOptions(language as Language);
-  const PRIORITY_OPTIONS = getPriorityOptions(language as Language);
-
   const handleTitleChange = (text: string) => {
     setTitle(text);
     setSelectedGame(null);
-    if (text.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    if (text.trim().length < 2) { setSearchResults([]); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
@@ -91,18 +83,13 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
   };
 
   const reset = () => {
-    setTitle('');
-    setPlatform('other');
-    setStatus('not_started');
-    setPriority('medium');
-    setNotes('');
-    setSearchResults([]);
-    setSelectedGame(null);
+    setTitle(''); setPlatform('other'); setStatus('not_started'); setPriority('medium');
+    setNotes(''); setSearchResults([]); setSelectedGame(null);
   };
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert(t('mgm_alert_title_req', language as Language), t('mgm_alert_title_msg', language as Language));
+      Alert.alert(t('mgm_alert_title_req', lang), t('mgm_alert_title_msg', lang));
       return;
     }
     setSaving(true);
@@ -125,8 +112,8 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
       onGameAdded();
       reset();
       onClose();
-    } catch (e) {
-      Alert.alert(t('mgm_alert_error', language as Language), t('mgm_alert_error_msg', language as Language));
+    } catch {
+      Alert.alert(t('mgm_alert_error', lang), t('mgm_alert_error_msg', lang));
     } finally {
       setSaving(false);
     }
@@ -134,181 +121,268 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-        <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
-
+      <View style={s.root}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { reset(); onClose(); }} style={styles.cancelBtn}>
-            <Text style={[styles.cancelText, { color: themeColors.textMuted }]}>{t('mgm_cancel', language as Language)}</Text>
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => { reset(); onClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={20} color={ED.ink3} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: themeColors.textPrimary }]}>{t('mgm_add_game', language as Language)}</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving} style={[styles.saveBtn, { backgroundColor: themeColors.accent }]}>
+          <Text style={edStyles.eyebrow}>ADD GAME</Text>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={saving}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={ED.copper} size="small" />
             ) : (
-              <Text style={styles.saveText}>{t('mgm_save', language as Language)}</Text>
+              <Text style={s.saveText}>{t('mgm_save', lang)}</Text>
             )}
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Title */}
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_title_label', language as Language)}</Text>
-          <View style={[styles.inputWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
+          <View style={s.titleBlock}>
+            <Text style={[edStyles.displayTitle, { fontSize: 30 }]}>Track any title.</Text>
+            <Text style={s.titleSub}>Search IGDB or enter details manually.</Text>
+          </View>
+
+          {/* Search bar */}
+          <View style={s.searchBar}>
+            <Ionicons name="search-outline" size={16} color={searching ? ED.copper : ED.ink3} />
             <TextInput
-              style={[styles.input, { color: themeColors.textPrimary }]}
-              placeholder={t('mgm_title_placeholder', language as Language)}
-              placeholderTextColor={themeColors.textMuted}
+              style={s.searchInput}
+              placeholder={t('mgm_title_placeholder', lang)}
+              placeholderTextColor={ED.ink4}
               value={title}
               onChangeText={handleTitleChange}
               autoCorrect={false}
             />
-            {searching && <ActivityIndicator size="small" color={themeColors.accent} />}
+            {searching && <ActivityIndicator size="small" color={ED.copper} />}
           </View>
 
           {/* Search results */}
           {searchResults.length > 0 && (
-            <View style={[styles.resultsPanel, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
-              {searchResults.map((game) => (
-                <TouchableOpacity
-                  key={game.igdbId}
-                  style={[styles.resultItem, { borderBottomColor: themeColors.glassBorder }]}
-                  onPress={() => selectGame(game)}
-                >
-                  <View>
-                    <Text style={[styles.resultTitle, { color: themeColors.textPrimary }]}>{game.title}</Text>
-                    <Text style={[styles.resultMeta, { color: themeColors.textMuted }]}>
-                      {[game.releaseYear, game.developer].filter(Boolean).join(' · ')}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={themeColors.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Selected metadata preview */}
-          {selectedGame && (
-            <View style={[styles.metaCard, { backgroundColor: themeColors.card, borderColor: themeColors.accent + '55' }]}>
-              <Ionicons name="checkmark-circle" size={16} color={themeColors.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.metaTitle, { color: themeColors.textPrimary }]}>{selectedGame.title}</Text>
-                <Text style={[styles.metaMeta, { color: themeColors.textMuted }]}>
-                  {[selectedGame.releaseYear, selectedGame.developer, selectedGame.platforms.slice(0, 2).join(', ')].filter(Boolean).join(' · ')}
-                </Text>
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>{searchResults.length} results from IGDB</Text>
               </View>
-              <TouchableOpacity onPress={() => { setSelectedGame(null); setTitle(''); }}>
-                <Ionicons name="close-circle-outline" size={20} color={themeColors.textMuted} />
-              </TouchableOpacity>
+              <View style={edStyles.card}>
+                {searchResults.map((game, idx) => (
+                  <TouchableOpacity
+                    key={game.igdbId}
+                    style={[
+                      s.resultRow,
+                      idx < searchResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
+                      selectedGame?.igdbId === game.igdbId && s.resultRowSelected,
+                    ]}
+                    onPress={() => selectGame(game)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.resultTitle} numberOfLines={1}>{game.title}</Text>
+                      <Text style={s.resultMeta}>
+                        {[game.releaseYear, game.developer].filter(Boolean).join(' · ')}
+                      </Text>
+                      {game.platforms.length > 0 && (
+                        <View style={{ flexDirection: 'row', gap: 4, marginTop: 5 }}>
+                          {game.platforms.slice(0, 3).map(p => (
+                            <View key={p} style={edStyles.pill}>
+                              <Text style={edStyles.pillText}>{p}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                    {selectedGame?.igdbId === game.igdbId ? (
+                      <Ionicons name="checkmark-circle" size={18} color={ED.copper} />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={14} color={ED.ink3} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
 
-          {/* Platform */}
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_platform', language as Language)}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            <View style={styles.optRow}>
-              {PLATFORM_OPTIONS.map((opt) => {
-                const active = platform === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    style={[styles.optChip, { borderColor: active ? themeColors.accent : themeColors.glassBorder, backgroundColor: active ? themeColors.accent + '22' : 'transparent' }]}
-                    onPress={() => setPlatform(opt.key)}
-                  >
-                    <Text style={[styles.optText, { color: active ? themeColors.accent : themeColors.textSecondary }]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          {/* Status */}
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_status', language as Language)}</Text>
-          <View style={[styles.optRow, { marginBottom: 16 }]}>
-            {STATUS_OPTIONS.map((opt) => {
-              const active = status === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[styles.optChip, { borderColor: active ? themeColors.teal : themeColors.glassBorder, backgroundColor: active ? themeColors.teal + '22' : 'transparent' }]}
-                  onPress={() => setStatus(opt.key)}
-                >
-                  <Text style={[styles.optText, { color: active ? themeColors.teal : themeColors.textSecondary }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* Divider */}
+          <View style={s.divider}>
+            <View style={s.dividerLine} />
+            <Text style={edStyles.eyebrow}>OR ENTER MANUALLY</Text>
+            <View style={s.dividerLine} />
           </View>
 
-          {/* Priority */}
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_priority', language as Language)}</Text>
-          <View style={[styles.optRow, { marginBottom: 16 }]}>
-            {PRIORITY_OPTIONS.map((opt) => {
-              const active = priority === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[styles.optChip, { borderColor: active ? themeColors.violet : themeColors.glassBorder, backgroundColor: active ? themeColors.violet + '22' : 'transparent' }]}
-                  onPress={() => setPriority(opt.key)}
-                >
-                  <Text style={[styles.optText, { color: active ? themeColors.violet : themeColors.textSecondary }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* Platform */}
+          <View style={s.section}>
+            <Text style={s.fieldLabel}>{t('mgm_platform', lang)}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4 }}>
+                {PLATFORM_OPTIONS.map((opt) => {
+                  const active = platform === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.optChip, active && s.optChipActive]}
+                      onPress={() => setPlatform(opt.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.optText, active && s.optTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Status + Priority row */}
+          <View style={[s.section, { flexDirection: 'row', gap: 12 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>{t('mgm_status', lang)}</Text>
+              <View style={{ gap: 6 }}>
+                {STATUS_OPTIONS.map((opt) => {
+                  const active = status === opt.key;
+                  const sc = STATUS_COLORS[opt.key];
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.selectRow, active && { borderColor: sc.color, backgroundColor: sc.bg }]}
+                      onPress={() => setStatus(opt.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.selectText, active && { color: sc.color }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>{t('mgm_priority', lang)}</Text>
+              <View style={{ gap: 6 }}>
+                {PRIORITY_OPTIONS.map((opt) => {
+                  const active = priority === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.selectRow, active && { borderColor: opt.color, backgroundColor: opt.color + '18' }]}
+                      onPress={() => setPriority(opt.key)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.selectText, active && { color: opt.color }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
 
           {/* Notes */}
-          <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_notes', language as Language)}</Text>
-          <View style={[styles.inputWrap, styles.textAreaWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
-            <TextInput
-              style={[styles.input, styles.textArea, { color: themeColors.textPrimary }]}
-              placeholder={t('mgm_notes_placeholder', language as Language)}
-              placeholderTextColor={themeColors.textMuted}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-            />
+          <View style={s.section}>
+            <Text style={s.fieldLabel}>{t('mgm_notes', lang)}</Text>
+            <View style={s.textAreaWrap}>
+              <TextInput
+                style={s.textArea}
+                placeholder={t('mgm_notes_placeholder', lang)}
+                placeholderTextColor={ED.ink4}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
           </View>
 
-          <View style={{ height: 60 }} />
+          {/* Save button */}
+          <TouchableOpacity
+            style={[edStyles.btn, edStyles.btnPrimary, { height: 50, marginTop: 8 }]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            {saving ? (
+              <ActivityIndicator color="#1A1108" size="small" />
+            ) : (
+              <>
+                <Ionicons name="add" size={16} color="#1A1108" />
+                <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>Add to library</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ height: 80 }} />
         </ScrollView>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: ED.bg },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 20 : 16,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomWidth: 1, borderBottomColor: ED.line,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
-  cancelBtn: { padding: 4 },
-  cancelText: { fontSize: 16 },
-  saveBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10, minWidth: 60, alignItems: 'center' },
-  saveText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  scroll: { padding: 16 },
-  label: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  inputWrap: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, height: 44, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  textAreaWrap: { height: 88, alignItems: 'flex-start', paddingTop: 10 },
-  input: { flex: 1, fontSize: 15 },
-  textArea: { textAlignVertical: 'top' },
-  resultsPanel: { borderRadius: 12, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
-  resultItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  resultTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  resultMeta: { fontSize: 12 },
-  metaCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 16 },
-  metaTitle: { fontSize: 14, fontWeight: '700' },
-  metaMeta: { fontSize: 12, marginTop: 2 },
-  optRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  optChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  optText: { fontSize: 13, fontWeight: '600' },
+  saveText: { fontSize: 14, fontWeight: '700', color: ED.copper },
+
+  scroll: { paddingHorizontal: 24, paddingTop: 4 },
+  titleBlock: { paddingVertical: 20 },
+  titleSub: { fontSize: 13, color: ED.ink3, marginTop: 6 },
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, height: 50,
+    borderRadius: 12, borderWidth: 1,
+    borderColor: ED.copperLine,
+    backgroundColor: ED.copperBg,
+    marginBottom: 20,
+  },
+  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', color: ED.ink },
+
+  section: { marginBottom: 20 },
+
+  resultRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  resultRowSelected: { backgroundColor: ED.copperBg },
+  resultTitle: { fontSize: 14, fontWeight: '600', color: ED.ink, marginBottom: 2 },
+  resultMeta: { fontSize: 11, color: ED.ink3 },
+
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: ED.line },
+
+  fieldLabel: { fontFamily: MONO_FONT, fontSize: 10, fontWeight: '600', letterSpacing: 1.2, color: ED.ink3, textTransform: 'uppercase', marginBottom: 8 },
+
+  optChip: {
+    height: 32, paddingHorizontal: 12, borderRadius: 8,
+    borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  optChipActive: { backgroundColor: ED.copperBg, borderColor: ED.copperLine },
+  optText: { fontSize: 12.5, fontWeight: '500', color: ED.ink2 },
+  optTextActive: { color: ED.copper },
+
+  selectRow: {
+    height: 38, paddingHorizontal: 10, borderRadius: 8,
+    borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2,
+    justifyContent: 'center',
+  },
+  selectText: { fontSize: 12.5, fontWeight: '500', color: ED.ink2 },
+
+  textAreaWrap: {
+    borderRadius: 12, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2,
+    padding: 12, minHeight: 80,
+  },
+  textArea: { fontSize: 14, color: ED.ink2, textAlignVertical: 'top' as const, lineHeight: 22 },
 });

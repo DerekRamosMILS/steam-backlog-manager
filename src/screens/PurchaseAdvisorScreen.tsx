@@ -9,13 +9,12 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { GlassCard } from '../components/GlassCard';
 import { GameCover } from '../components/GameCover';
 import { useAppContext } from '../hooks/useAppContext';
 import { t, Language, StringKey } from '../i18n';
@@ -24,6 +23,7 @@ import { searchGamesByTitle } from '../services/gameSearchService';
 import { searchHLTB } from '../api/hltb';
 import { getBacklogStats, getAllGames } from '../database/queries';
 import { ManualGameSearchResult, Game } from '../types';
+import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -83,35 +83,35 @@ const VERDICT_THEME: Record<VerdictLevel, {
   emoji: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-  bg: string[];
-  glow: string;
+  bg: string;
+  border: string;
 }> = {
   green: {
     label: 'GREEN LIGHT', esLabel: 'LUZ VERDE',
     emoji: '🟢', icon: 'checkmark-circle',
-    color: '#22c55e', bg: ['#001a08', '#003014'], glow: '#22c55e44',
+    color: '#4CAF7D', bg: '#081A0E', border: '#4CAF7D35',
   },
   yellow: {
     label: 'THINK TWICE', esLabel: 'PIÉNSALO',
     emoji: '⚠️', icon: 'warning',
-    color: '#f59e0b', bg: ['#1a1000', '#2e1c00'], glow: '#f59e0b44',
+    color: ED.amber, bg: '#1A1000', border: ED.amber + '35',
   },
   red: {
     label: 'TERRIBLE IDEA', esLabel: 'PÉSIMA IDEA',
     emoji: '💀', icon: 'skull',
-    color: '#ef4444', bg: ['#1a0000', '#2d0505'], glow: '#ef444455',
+    color: ED.rust, bg: '#1A0806', border: ED.rust + '35',
   },
   go: {
     label: 'BUY IT — COMMIT', esLabel: 'CÓMPRALO — COMPROMÉTETE',
     emoji: '❤️', icon: 'heart',
-    color: '#a855f7', bg: ['#0d0020', '#1a003a'], glow: '#a855f755',
+    color: ED.plum, bg: '#10061A', border: ED.plum + '35',
   },
 };
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PurchaseAdvisorScreen() {
-  const { themeColors, language, playerName = 'Player' } = useAppContext() as any;
+  const { language, playerName = 'Player' } = useAppContext() as any;
   const router = useRouter();
   const verdictRef = useRef<ViewShot>(null);
   const [step, setStep] = useState<Step>('search');
@@ -125,8 +125,9 @@ export default function PurchaseAdvisorScreen() {
   const [timing, setTiming] = useState<Timing | null>(null);
   const [verdict, setVerdict] = useState<VerdictData | null>(null);
   const [sharing, setSharing] = useState(false);
-
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const lang = language as Language;
 
   const handleQueryChange = (text: string) => {
     setQuery(text);
@@ -156,8 +157,6 @@ export default function PurchaseAdvisorScreen() {
 
   const handleAnalyze = async () => {
     if (!selectedGame || !motivation || !timing) return;
-    {
-    }
     setStep('analyzing');
     await new Promise((r) => setTimeout(r, 1400));
     const stats = getBacklogStats();
@@ -194,7 +193,7 @@ export default function PurchaseAdvisorScreen() {
       } else {
         Alert.alert(t('share_err_unavail', lang), t('share_err_unavail_msg', lang));
       }
-    } catch (e) {
+    } catch {
       Alert.alert(t('share_err_fail', lang), t('share_err_fail_msg', lang));
     } finally {
       setSharing(false);
@@ -211,8 +210,6 @@ export default function PurchaseAdvisorScreen() {
     setTiming(null);
     setVerdict(null);
   };
-
-  const lang = language as Language;
 
   const motivationOptions: { key: Motivation; label: string; emoji: string; special?: boolean }[] = [
     { key: 'everyone', label: t('pa_mot_everyone', lang), emoji: '🌐' },
@@ -233,164 +230,160 @@ export default function PurchaseAdvisorScreen() {
   const canAnalyze = selectedGame && !hltbLoading && motivation && timing;
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-      <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
-
+    <View style={s.root}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={24} color={themeColors.textPrimary} />
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="chevron-back" size={22} color={ED.ink} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('pa_title', lang)}</Text>
-          <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>{t('pa_subtitle', lang)}</Text>
+          <Text style={edStyles.eyebrow}>PURCHASE ADVISOR</Text>
+          <Text style={s.headerTitle}>{t('pa_title', lang)}</Text>
         </View>
-        <View style={[styles.headerBadge, { backgroundColor: '#a855f722', borderColor: '#a855f755' }]}>
-          <Ionicons name="analytics" size={14} color="#a855f7" />
-          <Text style={{ fontSize: 10, color: '#a855f7', fontWeight: '800' }}>AI</Text>
+        <View style={s.aiBadge}>
+          <Ionicons name="analytics" size={12} color={ED.plum} />
+          <Text style={s.aiBadgeText}>AI</Text>
         </View>
       </View>
 
       {/* ── STEP: Search + Questions ── */}
       {step === 'search' && (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Search card */}
-          <GlassCard padding={16} style={{ marginBottom: 16 }}>
-            <View style={styles.cardTitleRow}>
-              <Text style={styles.stepNum}>01</Text>
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>
-                {t('pa_search_placeholder', lang)}
-              </Text>
+          {/* Step 01: Game */}
+          <View style={s.stepCard}>
+            <View style={s.stepNumRow}>
+              <Text style={s.stepNum}>01</Text>
+              <Text style={s.stepLabel}>{t('pa_search_placeholder', lang)}</Text>
             </View>
-
-            <View style={[styles.searchWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
-              <Ionicons name="search" size={16} color={themeColors.textMuted} />
+            <View style={s.searchBar}>
+              <Ionicons name="search" size={15} color={searching ? ED.copper : ED.ink3} />
               <TextInput
-                style={[styles.searchInput, { color: themeColors.textPrimary }]}
+                style={s.searchInput}
                 placeholder={t('pa_search_hint', lang)}
-                placeholderTextColor={themeColors.textMuted}
+                placeholderTextColor={ED.ink4}
                 value={query}
                 onChangeText={handleQueryChange}
                 autoCorrect={false}
               />
-              {(searching || hltbLoading) && <ActivityIndicator size="small" color={themeColors.accent} />}
+              {(searching || hltbLoading) && <ActivityIndicator size="small" color={ED.copper} />}
               {query.length > 0 && !searching && !hltbLoading && (
                 <TouchableOpacity onPress={() => { setQuery(''); setSelectedGame(null); setSearchResults([]); }}>
-                  <Ionicons name="close-circle" size={16} color={themeColors.textMuted} />
+                  <Ionicons name="close-circle" size={15} color={ED.ink3} />
                 </TouchableOpacity>
               )}
             </View>
 
             {searchResults.length > 0 && (
-              <View style={[styles.dropdown, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
-                {searchResults.map((item) => (
+              <View style={s.dropdown}>
+                {searchResults.map((item, idx) => (
                   <TouchableOpacity
                     key={item.igdbId}
-                    style={[styles.dropdownItem, { borderBottomColor: themeColors.glassBorder }]}
+                    style={[s.dropdownItem, idx < searchResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
                     onPress={() => handleSelectGame(item)}
+                    activeOpacity={0.8}
                   >
-                    <GameCover uri={item.coverUrl ?? ''} width={36} height={36} radius={8} />
+                    <GameCover uri={item.coverUrl ?? ''} width={34} height={34} radius={6} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.dropdownTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
-                      {item.releaseYear && <Text style={{ fontSize: 11, color: themeColors.textMuted }}>{item.releaseYear}</Text>}
+                      <Text style={s.dropdownTitle} numberOfLines={1}>{item.title}</Text>
+                      {item.releaseYear ? <Text style={s.dropdownMeta}>{item.releaseYear}</Text> : null}
                     </View>
-                    <Ionicons name="chevron-forward" size={14} color={themeColors.textMuted} />
+                    <Ionicons name="chevron-forward" size={12} color={ED.ink3} />
                   </TouchableOpacity>
                 ))}
               </View>
             )}
 
             {selectedGame && (
-              <View style={[styles.selectedCard, { backgroundColor: themeColors.accent + '18', borderColor: themeColors.accent + '55' }]}>
-                <GameCover uri={selectedGame.coverUrl ?? ''} width={52} height={52} radius={10} />
+              <View style={s.selectedCard}>
+                <GameCover uri={selectedGame.coverUrl ?? ''} width={48} height={48} radius={8} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.selectedTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>{selectedGame.title}</Text>
+                  <Text style={s.selectedTitle} numberOfLines={2}>{selectedGame.title}</Text>
                   {hltbLoading ? (
-                    <View style={styles.hltbRow}>
-                      <ActivityIndicator size="small" color={themeColors.teal} />
-                      <Text style={{ fontSize: 11, color: themeColors.textMuted, marginLeft: 4 }}>Looking up HLTB…</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <ActivityIndicator size="small" color={ED.sky} />
+                      <Text style={s.hltbText}>Looking up HLTB…</Text>
                     </View>
                   ) : hltbHours !== null ? (
-                    <View style={styles.hltbRow}>
-                      <Ionicons name="time" size={12} color={themeColors.teal} />
-                      <Text style={{ fontSize: 12, color: themeColors.teal, fontWeight: '700', marginLeft: 4 }}>~{hltbHours}h to beat</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <Ionicons name="time-outline" size={11} color={ED.sky} />
+                      <Text style={[s.hltbText, { color: ED.sky, fontWeight: '700' }]}>~{hltbHours}h to beat</Text>
                     </View>
                   ) : (
-                    <Text style={{ fontSize: 11, color: themeColors.textMuted }}>No HLTB data found</Text>
+                    <Text style={[s.hltbText, { marginTop: 4 }]}>No HLTB data</Text>
                   )}
                 </View>
-                <View style={[styles.checkBadge, { backgroundColor: themeColors.accent }]}>
-                  <Ionicons name="checkmark" size={14} color="#fff" />
+                <View style={s.checkBadge}>
+                  <Ionicons name="checkmark" size={12} color="#1A1108" />
                 </View>
               </View>
             )}
-          </GlassCard>
+          </View>
 
-          {/* Motivation card */}
+          {/* Step 02: Motivation */}
           {selectedGame && !hltbLoading && (
-            <GlassCard padding={16} style={{ marginBottom: 16 }}>
-              <View style={styles.cardTitleRow}>
-                <Text style={styles.stepNum}>02</Text>
-                <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{t('pa_q_motivation', lang)}</Text>
+            <View style={s.stepCard}>
+              <View style={s.stepNumRow}>
+                <Text style={s.stepNum}>02</Text>
+                <Text style={s.stepLabel}>{t('pa_q_motivation', lang)}</Text>
               </View>
-              <View style={styles.optionGrid}>
+              <View style={s.optionGrid}>
                 {motivationOptions.map((opt) => {
                   const active = motivation === opt.key;
-                  const color = opt.special ? '#a855f7' : themeColors.accent;
+                  const color = opt.special ? ED.plum : ED.copper;
                   return (
                     <TouchableOpacity
                       key={opt.key}
-                      style={[styles.optionChip, { borderColor: active ? color : themeColors.glassBorder, backgroundColor: active ? color + '28' : themeColors.glass }]}
+                      style={[s.optChip, active && { borderColor: color, backgroundColor: color + '18' }]}
                       onPress={() => setMotivation(opt.key)}
+                      activeOpacity={0.8}
                     >
-                      <Text style={styles.optionEmoji}>{opt.emoji}</Text>
-                      <Text style={[styles.optionText, { color: active ? color : themeColors.textSecondary }]}>{opt.label}</Text>
+                      <Text style={{ fontSize: 14 }}>{opt.emoji}</Text>
+                      <Text style={[s.optText, active && { color }]}>{opt.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </GlassCard>
+            </View>
           )}
 
-          {/* Timing card */}
+          {/* Step 03: Timing */}
           {selectedGame && !hltbLoading && (
-            <GlassCard padding={16} style={{ marginBottom: 20 }}>
-              <View style={styles.cardTitleRow}>
-                <Text style={styles.stepNum}>03</Text>
-                <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>{t('pa_q_timing', lang)}</Text>
+            <View style={s.stepCard}>
+              <View style={s.stepNumRow}>
+                <Text style={s.stepNum}>03</Text>
+                <Text style={s.stepLabel}>{t('pa_q_timing', lang)}</Text>
               </View>
-              <View style={styles.optionGrid}>
+              <View style={s.optionGrid}>
                 {timingOptions.map((opt) => {
                   const active = timing === opt.key;
-                  const danger = opt.key === 'never';
-                  const color = danger ? themeColors.red : themeColors.teal;
+                  const color = opt.key === 'never' ? ED.rust : ED.sky;
                   return (
                     <TouchableOpacity
                       key={opt.key}
-                      style={[styles.optionChip, { borderColor: active ? color : themeColors.glassBorder, backgroundColor: active ? color + '28' : themeColors.glass }]}
+                      style={[s.optChip, active && { borderColor: color, backgroundColor: color + '18' }]}
                       onPress={() => setTiming(opt.key)}
+                      activeOpacity={0.8}
                     >
-                      <Text style={styles.optionEmoji}>{opt.emoji}</Text>
-                      <Text style={[styles.optionText, { color: active ? color : themeColors.textSecondary }]}>{opt.label}</Text>
+                      <Text style={{ fontSize: 14 }}>{opt.emoji}</Text>
+                      <Text style={[s.optText, active && { color }]}>{opt.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </GlassCard>
+            </View>
           )}
 
           {/* Analyze button */}
           {selectedGame && !hltbLoading && (
             <TouchableOpacity
-              style={[styles.analyzeBtn, { opacity: canAnalyze ? 1 : 0.35 }]}
+              style={[s.analyzeBtn, !canAnalyze && { opacity: 0.35 }]}
               onPress={handleAnalyze}
               disabled={!canAnalyze}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#a855f7', '#7c3aed']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-              <Ionicons name="analytics" size={20} color="#fff" />
-              <Text style={styles.analyzeBtnText}>{t('pa_analyze_btn', lang)}</Text>
+              <Ionicons name="analytics" size={18} color="#1A1108" />
+              <Text style={s.analyzeBtnText}>{t('pa_analyze_btn', lang)}</Text>
             </TouchableOpacity>
           )}
 
@@ -400,14 +393,15 @@ export default function PurchaseAdvisorScreen() {
 
       {/* ── STEP: Analyzing ── */}
       {step === 'analyzing' && (
-        <View style={styles.analyzingWrap}>
-          <LinearGradient colors={['#0d0020', '#1a003a']} style={StyleSheet.absoluteFill} />
-          <View style={styles.analyzingInner}>
-            <Ionicons name="analytics" size={56} color="#a855f7" />
-            <ActivityIndicator size="large" color="#a855f7" style={{ marginTop: 20 }} />
-            <Text style={styles.analyzingTitle}>{t('pa_analyzing', lang)}</Text>
+        <View style={s.analyzingWrap}>
+          <View style={s.analyzingInner}>
+            <View style={s.analyzingIcon}>
+              <Ionicons name="analytics" size={32} color={ED.plum} />
+            </View>
+            <ActivityIndicator size="large" color={ED.copper} style={{ marginTop: 24 }} />
+            <Text style={s.analyzingTitle}>{t('pa_analyzing', lang)}</Text>
             {selectedGame && (
-              <Text style={styles.analyzingGame} numberOfLines={1}>{selectedGame.title}</Text>
+              <Text style={s.analyzingGame} numberOfLines={1}>{selectedGame.title}</Text>
             )}
           </View>
         </View>
@@ -415,50 +409,41 @@ export default function PurchaseAdvisorScreen() {
 
       {/* ── STEP: Verdict ── */}
       {step === 'verdict' && verdict && (
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <VerdictDisplay
-            verdict={verdict}
-            lang={lang}
-            themeColors={themeColors}
-            verdictRef={verdictRef}
-          />
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <VerdictDisplay verdict={verdict} lang={lang} verdictRef={verdictRef} />
 
-          {/* Share button */}
           <TouchableOpacity
-            style={[styles.shareBtn, { backgroundColor: VERDICT_THEME[verdict.level].color }]}
+            style={[s.analyzeBtn, { backgroundColor: VERDICT_THEME[verdict.level].color, borderColor: VERDICT_THEME[verdict.level].color, marginTop: 16 }]}
             onPress={handleShare}
             activeOpacity={0.85}
           >
             {sharing ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#1A1108" />
             ) : (
               <>
-                <Ionicons name="share-social" size={20} color="#fff" />
-                <Text style={styles.shareBtnText}>{t('pa_share_verdict', lang)}</Text>
+                <Ionicons name="share-social" size={16} color="#1A1108" />
+                <Text style={s.analyzeBtnText}>{t('pa_share_verdict', lang)}</Text>
               </>
             )}
           </TouchableOpacity>
 
-          {/* Try again */}
-          <TouchableOpacity style={[styles.resetBtn, { borderColor: themeColors.glassBorder }]} onPress={handleReset}>
-            <Ionicons name="refresh" size={16} color={themeColors.textMuted} />
-            <Text style={[styles.resetBtnText, { color: themeColors.textMuted }]}>{t('pa_try_again', lang)}</Text>
+          <TouchableOpacity style={s.resetBtn} onPress={handleReset} activeOpacity={0.8}>
+            <Ionicons name="refresh" size={14} color={ED.ink3} />
+            <Text style={s.resetBtnText}>{t('pa_try_again', lang)}</Text>
           </TouchableOpacity>
 
           <View style={{ height: 100 }} />
         </ScrollView>
       )}
-
     </View>
   );
 }
 
 // ─── Verdict Display ──────────────────────────────────────────────────────────
 
-function VerdictDisplay({ verdict, lang, themeColors, verdictRef }: {
+function VerdictDisplay({ verdict, lang, verdictRef }: {
   verdict: VerdictData;
   lang: Language;
-  themeColors: any;
   verdictRef: React.RefObject<ViewShot>;
 }) {
   const theme = VERDICT_THEME[verdict.level];
@@ -466,120 +451,107 @@ function VerdictDisplay({ verdict, lang, themeColors, verdictRef }: {
 
   return (
     <>
-      {/* ─ Capturable share card ─ */}
+      {/* Capturable share card */}
       <ViewShot ref={verdictRef} options={{ format: 'png', quality: 0.97 }}>
-        <View style={[shareStyles.card, { backgroundColor: theme.bg[1] }]}>
-          <LinearGradient colors={theme.bg as [string, string, ...string[]]} style={StyleSheet.absoluteFill} />
-
-          {/* Glow overlay */}
-          <View style={[shareStyles.glowCircle, { backgroundColor: theme.glow }]} />
-
-          {/* BacklogFlow header */}
-          <View style={shareStyles.cardHeader}>
-            <View style={[shareStyles.logoBox, { backgroundColor: theme.color + '22', borderColor: theme.color + '55' }]}>
-              <Ionicons name="game-controller" size={16} color={theme.color} />
+        <View style={[sc.card, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+          {/* Header */}
+          <View style={sc.cardHeader}>
+            <View style={[sc.logoBox, { borderColor: theme.color + '50' }]}>
+              <Ionicons name="game-controller" size={14} color={theme.color} />
             </View>
-            <Text style={[shareStyles.logoText, { color: theme.color }]}>BacklogFlow</Text>
-            <Text style={[shareStyles.featureTag, { color: theme.color + 'aa' }]}>Reality Check</Text>
+            <Text style={[sc.logoText, { color: theme.color }]}>BacklogFlow</Text>
+            <Text style={[sc.featureTag, { color: theme.color + 'AA' }]}>Reality Check</Text>
           </View>
 
           {/* Verdict badge */}
-          <View style={shareStyles.verdictBadgeWrap}>
-            <View style={[shareStyles.verdictBadge, { backgroundColor: theme.color + '22', borderColor: theme.color + '77' }]}>
-              <Text style={shareStyles.verdictEmoji}>{theme.emoji}</Text>
-              <Text style={[shareStyles.verdictLabel, { color: theme.color }]}>
-                {lang === 'es' ? theme.esLabel : theme.label}
-              </Text>
-            </View>
+          <View style={[sc.verdictBadge, { backgroundColor: theme.color + '18', borderColor: theme.color + '60' }]}>
+            <Text style={{ fontSize: 20 }}>{theme.emoji}</Text>
+            <Text style={[sc.verdictLabel, { color: theme.color }]}>
+              {lang === 'es' ? theme.esLabel : theme.label}
+            </Text>
           </View>
 
           {/* Game title */}
-          <Text style={shareStyles.gameTitle} numberOfLines={2}>{verdict.gameTitle}</Text>
+          <Text style={sc.gameTitle} numberOfLines={2}>{verdict.gameTitle}</Text>
           {verdict.gameHours !== null && (
-            <Text style={[shareStyles.gameHours, { color: theme.color }]}>~{verdict.gameHours}h to beat</Text>
+            <Text style={[sc.gameHours, { color: theme.color }]}>~{verdict.gameHours}h to beat</Text>
           )}
 
           {/* Divider */}
-          <View style={[shareStyles.divider, { backgroundColor: theme.color + '33' }]} />
+          <View style={[sc.divider, { backgroundColor: theme.color + '30' }]} />
 
-          {/* Stats */}
-          <View style={shareStyles.statsRow}>
-            <View style={shareStyles.statBlock}>
-              <Text style={[shareStyles.statNum, { color: '#fff' }]}>{verdict.totalGames}</Text>
-              <Text style={shareStyles.statLbl}>games</Text>
-            </View>
-            <View style={[shareStyles.statDivider, { backgroundColor: theme.color + '44' }]} />
-            <View style={shareStyles.statBlock}>
-              <Text style={[shareStyles.statNum, { color: '#fff' }]}>{verdict.backlogHoursBefore}h</Text>
-              <Text style={shareStyles.statLbl}>backlog</Text>
-            </View>
-            <View style={[shareStyles.statDivider, { backgroundColor: theme.color + '44' }]} />
-            <View style={shareStyles.statBlock}>
-              <Text style={[shareStyles.statNum, { color: theme.color }]}>{verdict.finishYearBefore}</Text>
-              <Text style={shareStyles.statLbl}>finish year</Text>
-            </View>
+          {/* Stats row */}
+          <View style={sc.statsRow}>
+            {[
+              { val: String(verdict.totalGames), lbl: 'games' },
+              { val: `${verdict.backlogHoursBefore}h`, lbl: 'backlog' },
+              { val: String(verdict.finishYearBefore), lbl: 'finish yr', color: theme.color },
+            ].map(({ val, lbl, color }, i, arr) => (
+              <React.Fragment key={lbl}>
+                {i > 0 && <View style={[sc.statDivider, { backgroundColor: theme.color + '30' }]} />}
+                <View style={sc.statBlock}>
+                  <Text style={[sc.statNum, color ? { color } : {}]}>{val}</Text>
+                  <Text style={sc.statLbl}>{lbl}</Text>
+                </View>
+              </React.Fragment>
+            ))}
           </View>
 
           {/* Year comparison */}
-          <View style={[shareStyles.yearCompare, { borderColor: theme.color + '33', backgroundColor: theme.color + '0d' }]}>
+          <View style={[sc.yearBox, { borderColor: theme.color + '30', backgroundColor: theme.color + '0A' }]}>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: '#ffffff66', marginBottom: 2 }}>
-                {t('pa_finish_before', lang)}
-              </Text>
-              <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff' }}>{verdict.finishYearBefore}</Text>
+              <Text style={sc.yearBoxLabel}>{t('pa_finish_before', lang)}</Text>
+              <Text style={sc.yearNum}>{verdict.finishYearBefore}</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={[shareStyles.arrowText, { color: theme.color }]}>→</Text>
-              {yearDelta > 0 && (
-                <Text style={{ fontSize: 11, color: theme.color, fontWeight: '700' }}>+{yearDelta}yr</Text>
-              )}
+              <Text style={[sc.yearArrow, { color: theme.color }]}>→</Text>
+              {yearDelta > 0 && <Text style={[sc.yearDelta, { color: theme.color }]}>+{yearDelta}yr</Text>}
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 11, color: '#ffffff66', marginBottom: 2 }}>
-                {t('pa_finish_after', lang)}
-              </Text>
-              <Text style={{ fontSize: 26, fontWeight: '900', color: theme.color }}>{verdict.finishYearAfter}</Text>
+              <Text style={sc.yearBoxLabel}>{t('pa_finish_after', lang)}</Text>
+              <Text style={[sc.yearNum, { color: theme.color }]}>{verdict.finishYearAfter}</Text>
             </View>
           </View>
 
           {/* Verdict description */}
-          <View style={[shareStyles.descBox, { borderLeftColor: theme.color, backgroundColor: theme.color + '0d' }]}>
-            <Text style={[shareStyles.descText, { color: verdict.level === 'red' || verdict.level === 'go' ? '#fff' : '#ffffffcc' }]}>
-              {t(('pa_desc_' + verdict.level) as StringKey, lang)}
-            </Text>
+          <View style={[sc.descBox, { borderLeftColor: theme.color, backgroundColor: theme.color + '0A' }]}>
+            <Text style={sc.descText}>{t(('pa_desc_' + verdict.level) as StringKey, lang)}</Text>
           </View>
 
-          {/* Footer */}
-          <Text style={shareStyles.cardFooter}>BacklogFlow · backlogflow.app</Text>
+          <Text style={sc.cardFooter}>BacklogFlow · backlogflow.app</Text>
         </View>
       </ViewShot>
 
-      {/* ─ Similar games (below share card, not captured) ─ */}
+      {/* Similar games (not captured) */}
       {verdict.similarGames.length > 0 && (
-        <GlassCard padding={16} style={{ marginTop: 16 }}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="layers" size={16} color={themeColors.accent} />
-            <Text style={[styles.cardTitle, { color: themeColors.textPrimary, marginLeft: 6 }]}>
-              {t('pa_similar_desc', lang)}
-            </Text>
+        <View style={[edStyles.card, { marginTop: 16 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderBottomWidth: 1, borderBottomColor: ED.line }}>
+            <Ionicons name="layers" size={14} color={ED.copper} />
+            <Text style={[edStyles.eyebrow, { color: ED.copper }]}>{t('pa_similar_desc', lang)}</Text>
           </View>
-          {verdict.similarGames.map((g) => (
-            <View key={g.id} style={[styles.similarRow, { borderBottomColor: themeColors.glassBorder }]}>
-              <GameCover uri={g.cover_url} width={44} height={44} radius={8} />
+          {verdict.similarGames.map((g, idx) => (
+            <View
+              key={g.id}
+              style={[
+                { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+                idx < verdict.similarGames.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
+              ]}
+            >
+              <GameCover uri={g.cover_url} width={40} height={40} radius={8} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.similarTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>{g.title}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: ED.ink }} numberOfLines={1}>{g.title}</Text>
                 {g.hltb_main_story !== null && (
-                  <Text style={{ fontSize: 11, color: themeColors.textMuted }}>⏱ ~{Math.round(g.hltb_main_story / 3600)}h</Text>
+                  <Text style={{ fontSize: 11, color: ED.ink3, marginTop: 2 }}>
+                    ~{Math.round(g.hltb_main_story / 3600)}h
+                  </Text>
                 )}
               </View>
-              <View style={[styles.statusPill, { backgroundColor: themeColors.accent + '22', borderColor: themeColors.accent + '55' }]}>
-                <Text style={{ fontSize: 9, color: themeColors.accent, fontWeight: '800', textTransform: 'uppercase' }}>
-                  {g.status.replace('_', ' ')}
-                </Text>
+              <View style={[edStyles.pill]}>
+                <Text style={edStyles.pillText}>{g.status.replace('_', ' ')}</Text>
               </View>
             </View>
           ))}
-        </GlassCard>
+        </View>
       )}
     </>
   );
@@ -587,131 +559,163 @@ function VerdictDisplay({ verdict, lang, themeColors, verdictRef }: {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: ED.bg },
+
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingTop: 56, paddingHorizontal: 16, paddingBottom: 14,
+    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingHorizontal: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: ED.line,
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, marginTop: 2 },
-  headerBadge: {
+  backBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: ED.surface2, alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.6, color: ED.ink, marginTop: 2 },
+  aiBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: ED.plum + '50',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: ED.plumBg,
   },
-  scroll: { paddingHorizontal: 16, paddingTop: 4 },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  stepNum: { fontSize: 11, fontWeight: '900', color: '#a855f7', marginRight: 8, letterSpacing: 1 },
-  cardTitle: { fontSize: 14, fontWeight: '800' },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 46,
+  aiBadgeText: {
+    fontFamily: MONO_FONT, fontSize: 10, fontWeight: '700', color: ED.plum, letterSpacing: 0.8,
   },
-  searchInput: { flex: 1, fontSize: 14 },
+
+  scroll: { paddingHorizontal: 16, paddingTop: 16 },
+
+  stepCard: {
+    borderRadius: 14, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface1, padding: 16, marginBottom: 14,
+  },
+  stepNumRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  stepNum: {
+    fontFamily: MONO_FONT, fontSize: 11, fontWeight: '700',
+    color: ED.plum, marginRight: 10, letterSpacing: 1,
+  },
+  stepLabel: { fontSize: 14, fontWeight: '700', color: ED.ink },
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1, borderColor: ED.copperLine, borderRadius: 12,
+    backgroundColor: ED.copperBg, paddingHorizontal: 12, height: 46,
+  },
+  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', color: ED.ink },
+
   dropdown: {
-    borderRadius: 12, borderWidth: 1, marginTop: 8, overflow: 'hidden',
+    borderRadius: 12, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2, marginTop: 8, overflow: 'hidden',
   },
   dropdownItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 10, borderBottomWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
   },
-  dropdownTitle: { fontSize: 13, fontWeight: '600' },
+  dropdownTitle: { fontSize: 13, fontWeight: '600', color: ED.ink },
+  dropdownMeta: { fontSize: 11, color: ED.ink3, marginTop: 1 },
+
   selectedCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 12,
+    marginTop: 12, borderRadius: 12, borderWidth: 1,
+    borderColor: ED.copperLine, backgroundColor: ED.copperBg, padding: 12,
   },
-  selectedTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  hltbRow: { flexDirection: 'row', alignItems: 'center' },
+  selectedTitle: { fontSize: 14, fontWeight: '700', color: ED.ink },
+  hltbText: { fontSize: 11, color: ED.ink3 },
   checkBadge: {
-    width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: ED.copper, alignItems: 'center', justifyContent: 'center',
   },
+
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionChip: {
+  optChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1,
+    borderRadius: 100, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2,
   },
-  optionEmoji: { fontSize: 14 },
-  optionText: { fontSize: 12, fontWeight: '700' },
+  optText: { fontSize: 12, fontWeight: '600', color: ED.ink2 },
+
   analyzeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    height: 54, borderRadius: 16, overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 52, borderRadius: 14, borderWidth: 1,
+    backgroundColor: ED.copper, borderColor: ED.copper,
   },
-  analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  analyzingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  analyzeBtnText: { fontSize: 15, fontWeight: '800', color: '#1A1108' },
+
+  analyzingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   analyzingInner: { alignItems: 'center' },
-  analyzingTitle: { color: '#a855f7', fontSize: 16, fontWeight: '700', marginTop: 16 },
-  analyzingGame: { color: '#ffffff88', fontSize: 13, marginTop: 6, maxWidth: 260, textAlign: 'center' },
-  shareBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    height: 54, borderRadius: 16, marginTop: 16,
+  analyzingIcon: {
+    width: 72, height: 72, borderRadius: 20,
+    backgroundColor: ED.plumBg, borderWidth: 1, borderColor: ED.plum + '40',
+    alignItems: 'center', justifyContent: 'center',
   },
-  shareBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  analyzingTitle: { fontFamily: MONO_FONT, fontSize: 13, color: ED.copper, marginTop: 16, letterSpacing: 1.2 },
+  analyzingGame: { fontSize: 14, color: ED.ink3, marginTop: 6, maxWidth: 260, textAlign: 'center' },
+
   resetBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12,
+    borderWidth: 1, borderColor: ED.line, borderRadius: 12,
+    paddingVertical: 14, marginTop: 12, backgroundColor: ED.surface1,
   },
-  resetBtnText: { fontSize: 14, fontWeight: '600' },
-  similarRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, borderBottomWidth: 1,
-  },
-  similarTitle: { fontSize: 13, fontWeight: '700' },
-  statusPill: {
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1,
-  },
+  resetBtnText: { fontSize: 13, fontWeight: '600', color: ED.ink3 },
 });
 
-// ─── Share card styles (fixed-width for screenshot) ───────────────────────────
+// ─── Share card styles ────────────────────────────────────────────────────────
 
-const shareStyles = StyleSheet.create({
+const sc = StyleSheet.create({
   card: {
-    width: SCREEN_W - 32,
-    borderRadius: 24,
-    overflow: 'hidden',
-    padding: 24,
-    position: 'relative',
+    width: SCREEN_W - 32, borderRadius: 20, borderWidth: 1,
+    overflow: 'hidden', padding: 22,
   },
-  glowCircle: {
-    position: 'absolute', width: 260, height: 260, borderRadius: 130,
-    top: -80, right: -60, opacity: 0.4,
-  },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 22,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
   logoBox: {
-    width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+    width: 26, height: 26, borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
-  logoText: { fontSize: 14, fontWeight: '900', letterSpacing: -0.3, flex: 1 },
-  featureTag: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  verdictBadgeWrap: { marginBottom: 16 },
+  logoText: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3, flex: 1 },
+  featureTag: {
+    fontFamily: MONO_FONT, fontSize: 9, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 1.2,
+  },
   verdictBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    alignSelf: 'flex-start', borderRadius: 14, borderWidth: 1.5,
-    paddingHorizontal: 16, paddingVertical: 10,
+    alignSelf: 'flex-start', borderRadius: 12, borderWidth: 1.5,
+    paddingHorizontal: 14, paddingVertical: 9, marginBottom: 16,
   },
-  verdictEmoji: { fontSize: 22 },
-  verdictLabel: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  gameTitle: { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: -0.8, lineHeight: 34, marginBottom: 6 },
-  gameHours: { fontSize: 13, fontWeight: '700', marginBottom: 20 },
-  divider: { height: 1, width: '100%', marginVertical: 20 },
-  statsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  verdictLabel: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  gameTitle: {
+    fontSize: 26, fontWeight: '900', color: '#F0E8DE',
+    letterSpacing: -0.8, lineHeight: 30, marginBottom: 6,
+  },
+  gameHours: { fontSize: 12, fontWeight: '700', marginBottom: 18 },
+  divider: { height: 1, marginVertical: 18 },
+  statsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   statBlock: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  statLbl: { fontSize: 10, color: '#ffffff55', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
-  statDivider: { width: 1, height: 36 },
-  yearCompare: {
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
-    borderWidth: 1, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 12,
-    marginBottom: 16,
+  statNum: { fontSize: 20, fontWeight: '900', color: '#F0E8DE', letterSpacing: -0.5 },
+  statLbl: {
+    fontFamily: MONO_FONT, fontSize: 9, color: 'rgba(240,232,222,0.4)',
+    fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2,
   },
-  arrowText: { fontSize: 24, fontWeight: '900' },
+  statDivider: { width: 1, height: 30 },
+  yearBox: {
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
+    borderWidth: 1, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  yearBoxLabel: {
+    fontFamily: MONO_FONT, fontSize: 9, color: 'rgba(240,232,222,0.4)',
+    letterSpacing: 0.5, marginBottom: 4,
+  },
+  yearNum: { fontSize: 24, fontWeight: '900', color: '#F0E8DE', letterSpacing: -0.5 },
+  yearArrow: { fontSize: 22, fontWeight: '900' },
+  yearDelta: { fontFamily: MONO_FONT, fontSize: 10, fontWeight: '700', marginTop: 2 },
   descBox: {
     borderLeftWidth: 3, borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 10,
-    marginBottom: 20,
+    paddingHorizontal: 12, paddingVertical: 10, marginBottom: 18,
   },
-  descText: { fontSize: 13, lineHeight: 20, fontWeight: '600' },
-  cardFooter: { fontSize: 11, color: '#ffffff33', textAlign: 'center', fontWeight: '600' },
+  descText: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: 'rgba(240,232,222,0.85)' },
+  cardFooter: {
+    fontFamily: MONO_FONT, fontSize: 9, color: 'rgba(240,232,222,0.2)',
+    textAlign: 'center', fontWeight: '600', letterSpacing: 0.5,
+  },
 });

@@ -4,18 +4,14 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    Switch,
-    ActivityIndicator,
     TouchableOpacity,
+    Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { GlassCard } from '../../src/components/GlassCard';
-import { SectionHeader } from '../../src/components/SectionHeader';
-import { GameCard } from '../../src/components/GameCard';
 import { useAppContext } from '../../src/hooks/useAppContext';
 import { t } from '../../src/i18n';
+import { ED, edStyles, MONO_FONT, coverPaletteFor } from '../../src/styles/editorial';
 import {
     BacklogMission,
     DailyPick,
@@ -39,7 +35,6 @@ import {
     isAiProfileInitialized,
 } from '../../src/services/recommendationService';
 import { trackEvent } from '../../src/services/analyticsService';
-
 import { Language } from '../../src/i18n';
 
 function getMoodOptions(lang: Language): { label: string; value: RecommendationMood }[] {
@@ -71,14 +66,41 @@ function getGoalOptions(lang: Language): { label: string; value: RecommendationG
     ];
 }
 
-export default function RecommendationsScreen() {
+function CoverPlaceholder({ title, width, height, radius = 10, seed = 0 }: {
+    title: string; width: number; height: number; radius?: number; seed?: number;
+}) {
+    const pal = coverPaletteFor(title, seed);
+    return (
+        <View style={{
+            width, height, borderRadius: radius,
+            backgroundColor: pal.b,
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+        }}>
+            <View style={{
+                position: 'absolute', bottom: -10, right: -10,
+                width: width * 0.8, height: width * 0.8,
+                borderRadius: width * 0.4,
+                backgroundColor: pal.a,
+                opacity: 0.5,
+            }} />
+            <Text style={{
+                fontFamily: MONO_FONT, fontSize: 9, fontWeight: '600',
+                color: ED.ink3, textAlign: 'center', paddingHorizontal: 4,
+                letterSpacing: 0.5, textTransform: 'uppercase',
+            }} numberOfLines={2}>{title}</Text>
+        </View>
+    );
+}
+
+export default function PickScreen() {
     const router = useRouter();
-    const { themeColors } = useAppContext();
     const { language = 'en' } = useAppContext() as any;
     const MOOD_OPTIONS = getMoodOptions(language as Language);
     const SESSION_OPTIONS = getSessionOptions(language as Language);
     const GOAL_OPTIONS = getGoalOptions(language as Language);
-    const [focusMode, setFocusMode] = useState(false);
+
     const [sessionHours, setSessionHours] = useState<number | undefined>(undefined);
     const [mood, setMood] = useState<RecommendationMood>('balanced');
     const [goal, setGoal] = useState<RecommendationGoal>('none');
@@ -89,7 +111,6 @@ export default function RecommendationsScreen() {
     const [tasteProfile, setTasteProfile] = useState<TasteProfile | null>(null);
     const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
     const [versus, setVersus] = useState<VersusPair | null>(null);
-    const [loading, setLoading] = useState(true);
     const [versusSelected, setVersusSelected] = useState<number | null>(null);
     const [versusMsg, setVersusMsg] = useState('');
     const versusShownIds = React.useRef<number[]>([]);
@@ -98,24 +119,21 @@ export default function RecommendationsScreen() {
     useFocusEffect(
         React.useCallback(() => {
             loadData();
-        }, [])
+        }, [mood, sessionHours, goal])
     );
 
     const loadData = () => {
-        setLoading(true);
         setVersusSelected(null);
         setVersusMsg('');
         versusShownIds.current = [];
         setProfileInitialized(isAiProfileInitialized());
-        setRecs(
-            getRecommendations({
-                mode: focusMode ? 'focus' : 'balanced',
-                availableTimeHours: sessionHours,
-                mood,
-                goal,
-                limit: 6,
-            })
-        );
+        setRecs(getRecommendations({
+            mode: 'balanced',
+            availableTimeHours: sessionHours,
+            mood,
+            goal,
+            limit: 6,
+        }));
         setDailyPick(getDailyPick());
         setMissions(getBacklogMissions());
         setCollections(getSmartCollections());
@@ -127,7 +145,6 @@ export default function RecommendationsScreen() {
         }
         setVersus(firstPair);
         trackEvent('ai_pick_used');
-        setLoading(false);
     };
 
     const pickVersus = (rec: Recommendation) => {
@@ -145,368 +162,435 @@ export default function RecommendationsScreen() {
         }, 1200);
     };
 
-    return (
-        <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-            <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
+    const topRec = recs[0] ?? null;
+    const restRecs = recs.slice(1);
 
-            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('ai_title', language as Language)}</Text>
-                    <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
-                        {t('ai_subtitle_premium', language as Language)}
+    const now = new Date();
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const timeStr = `${dayNames[now.getDay()]} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    return (
+        <View style={s.root}>
+            <ScrollView
+                contentContainerStyle={s.scroll}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* ── Header ── */}
+                <View style={s.header}>
+                    <Text style={[edStyles.eyebrow, { color: ED.copper, marginBottom: 6 }]}>
+                        ◆ AI · {timeStr}
+                    </Text>
+                    <Text style={[edStyles.displayTitle, { fontSize: 38 }]}>Pick.</Text>
+                    <Text style={s.headerSub}>
+                        What kind of evening are you having?{'\n'}I'll find something from your library.
                     </Text>
                 </View>
 
-                {/* Intent filters (always visible) */}
-                <View style={styles.section}>
-                    <GlassCard padding={20} style={styles.focusSwitchCard}>
-                        <View style={styles.focusTextWrap}>
-                            <Text style={[styles.focusTitle, { color: themeColors.textPrimary }]}>{t('ai_focus_mode', language as Language)}</Text>
-                            <Text style={[styles.focusSubtitle, { color: themeColors.textMuted }]}>
-                                {t('ai_focus_desc', language as Language)}
-                            </Text>
-                        </View>
-                        <Switch
-                            value={focusMode}
-                            onValueChange={setFocusMode}
-                            trackColor={{ false: themeColors.glassBorder, true: themeColors.accent }}
-                            thumbColor={themeColors.textPrimary}
-                        />
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_mood', language as Language)}</Text>
-                        <View style={styles.sessionChips}>
-                            {MOOD_OPTIONS.map((option) => {
-                                const active = mood === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.value}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.accent : themeColors.card,
-                                                borderColor: active ? themeColors.accent : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setMood(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_session', language as Language)}</Text>
-                        <View style={styles.sessionChips}>
-                            {SESSION_OPTIONS.map((option) => {
-                                const active = sessionHours === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.label}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.violet : themeColors.card,
-                                                borderColor: active ? themeColors.violet : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setSessionHours(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_goal', language as Language)}</Text>
-                        <View style={styles.sessionChips}>
-                            {GOAL_OPTIONS.map((option) => {
-                                const active = goal === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.value}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.teal : themeColors.card,
-                                                borderColor: active ? themeColors.teal : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setGoal(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <TouchableOpacity
-                    style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
-                    onPress={loadData}
-                    activeOpacity={0.85}
+                {/* ── Mood chips ── */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.moodScroll}
+                    style={{ marginHorizontal: -24 }}
                 >
-                    <Ionicons name="sparkles" size={16} color="#fff" />
-                    <Text style={styles.applyBtnText}>{t('ai_get_picks', language as Language)}</Text>
-                </TouchableOpacity>
+                    {MOOD_OPTIONS.map((opt) => {
+                        const active = mood === opt.value;
+                        return (
+                            <TouchableOpacity
+                                key={opt.value}
+                                style={[s.chip, active && s.chipActive]}
+                                onPress={() => setMood(opt.value)}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[s.chipText, active && s.chipTextActive]}>
+                                    {opt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
 
-                {/* Daily Pick */}
-                {dailyPick && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_daily_pick', language as Language)} icon="flash" iconColor={themeColors.teal} />
-                        <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
-                            <GlassCard padding={18} radius={20} borderColor={themeColors.teal} style={{ overflow: 'hidden' }}>
-                                <LinearGradient
-                                    colors={[themeColors.teal + '22', themeColors.blue + '10']}
-                                    style={StyleSheet.absoluteFill}
-                                />
-                                <View style={styles.dailyHeader}>
-                                    <View style={[styles.dailyIcon, { backgroundColor: themeColors.teal + '22' }]}>
-                                        <Ionicons name="flash" size={20} color={themeColors.teal} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.dailyTitle, { color: themeColors.textPrimary }]}>
-                                            {dailyPick.recommendation.game.title}
+                {/* ── Session + Goal row ── */}
+                <View style={s.filterRow}>
+                    {/* Session */}
+                    <View style={[edStyles.card, s.filterCard]}>
+                        <Text style={[edStyles.eyebrow, { marginBottom: 8 }]}>Session</Text>
+                        <View style={s.sessionBtns}>
+                            {SESSION_OPTIONS.map((opt) => {
+                                const active = sessionHours === opt.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={opt.label}
+                                        style={[s.sessionBtn, active && s.sessionBtnActive]}
+                                        onPress={() => setSessionHours(opt.value)}
+                                        activeOpacity={0.75}
+                                    >
+                                        <Text style={[s.sessionBtnText, active && s.sessionBtnTextActive]}>
+                                            {opt.label}
                                         </Text>
-                                        <Text style={[styles.dailySubtitle, { color: themeColors.textSecondary }]}>
-                                            {dailyPick.recommendation.reason}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.badgeRow}>
-                                    {dailyPick.recommendation.badges.map((badge) => (
-                                        <View key={badge} style={[styles.smallBadge, { borderColor: themeColors.teal + '55', backgroundColor: themeColors.teal + '14' }]}>
-                                            <Text style={[styles.smallBadgeText, { color: themeColors.teal }]}>{badge}</Text>
-                                        </View>
-                                    ))}
-                                </View>
-                                <Text style={[styles.dailyStreak, { color: themeColors.teal }]}>{dailyPick.subtitle}</Text>
-                            </GlassCard>
-                        </TouchableOpacity>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     </View>
-                )}
 
-                {/* Top Picks */}
-                <View style={styles.section}>
-                    <SectionHeader title={t('ai_top_picks', language as Language)} icon="sparkles" iconColor={themeColors.orange} />
-
-                    {loading ? (
-                        <ActivityIndicator size="large" color={themeColors.orange} style={{ marginTop: 40 }} />
-                    ) : recs.length === 0 ? (
-                        <GlassCard padding={20}>
-                            <Text style={{ color: themeColors.textMuted, textAlign: 'center' }}>
-                                {t('ai_no_games', language as Language)}
-                            </Text>
-                        </GlassCard>
-                    ) : (
-                        recs.map((rec) => (
-                            <View key={rec.game.id} style={styles.recWrapper}>
-                                <View style={[styles.reasonCard, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
-                                    <Ionicons name="sparkles" size={14} color={themeColors.violet} />
-                                    <View style={styles.reasonContent}>
-                                        <View style={styles.badgeRow}>
-                                            {rec.badges.map((badge) => {
-                                                const isLowConf = badge === 'Low confidence';
-                                                return (
-                                                    <View
-                                                        key={badge}
-                                                        style={[
-                                                            styles.smallBadge,
-                                                            isLowConf
-                                                                ? { borderColor: themeColors.orange + '55', backgroundColor: themeColors.orange + '12' }
-                                                                : { borderColor: themeColors.accent + '55', backgroundColor: themeColors.accent + '12' },
-                                                        ]}
-                                                    >
-                                                        <Text style={[styles.smallBadgeText, { color: isLowConf ? themeColors.orange : themeColors.accent }]}>
-                                                            {badge}
-                                                        </Text>
-                                                    </View>
-                                                );
-                                            })}
-                                        </View>
-                                        <Text style={[styles.reasonText, { color: themeColors.textPrimary }]}>
-                                            {rec.reason}
-                                        </Text>
-                                        {rec.whyNot ? (
-                                            <Text style={[styles.whyNotText, { color: themeColors.textMuted }]}>
-                                                {t('ai_why_not', language as Language)} {rec.whyNot}
-                                            </Text>
-                                        ) : null}
-                                    </View>
-                                </View>
-                                <GameCard game={rec.game} />
-                            </View>
-                        ))
-                    )}
-                </View>
-
-                {/* Taste Profile */}
-                {tasteProfile && profileInitialized && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
-                        <GlassCard padding={18}>
-                            <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{tasteProfile.title}</Text>
-                            <Text style={[styles.profileSummary, { color: themeColors.textSecondary }]}>{tasteProfile.summary}</Text>
-                            <View style={styles.badgeRow}>
-                                {tasteProfile.tags.map((tag) => (
-                                    <View key={tag} style={[styles.smallBadge, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.card }]}>
-                                        <Text style={[styles.smallBadgeText, { color: themeColors.textPrimary }]}>{tag}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </GlassCard>
-                    </View>
-                )}
-
-                {tasteProfile && !profileInitialized && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
-                        <GlassCard padding={18}>
-                            <View style={styles.buildProfileRow}>
-                                <Ionicons name="bar-chart-outline" size={20} color={themeColors.orange} />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{t('ai_build_profile', language as Language)}</Text>
-                                    <Text style={[styles.profileSummary, { color: themeColors.textSecondary }]}>
-                                        {t('ai_build_profile_desc', language as Language)}
-                                    </Text>
-                                </View>
-                            </View>
-                        </GlassCard>
-                    </View>
-                )}
-
-                {/* Versus Picker */}
-                {versus && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_versus', language as Language)} icon="git-compare" iconColor={themeColors.accent} />
-                        <GlassCard padding={18}>
-                            <Text style={[styles.versusPrompt, { color: themeColors.textPrimary }]}>{t('ai_versus_prompt', language as Language)}</Text>
-                            {versusMsg ? (
-                                <View style={[styles.versusMsg, { backgroundColor: themeColors.accent + '22' }]}>
-                                    <Ionicons name="checkmark-circle" size={16} color={themeColors.accent} />
-                                    <Text style={[styles.versusMsgText, { color: themeColors.accent }]}>{versusMsg}</Text>
-                                </View>
-                            ) : null}
-                            <View style={styles.versusRow}>
-                                {[versus.left, versus.right].map((rec) => {
-                                    const isSelected = versusSelected === rec.game.id;
+                    {/* Goal */}
+                    <View style={[edStyles.card, s.filterCard]}>
+                        <Text style={[edStyles.eyebrow, { marginBottom: 8 }]}>Goal</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
+                            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4 }}>
+                                {GOAL_OPTIONS.map((opt) => {
+                                    const active = goal === opt.value;
                                     return (
                                         <TouchableOpacity
-                                            key={rec.game.id}
-                                            style={[
-                                                styles.versusCard,
-                                                {
-                                                    borderColor: isSelected ? themeColors.accent : themeColors.glassBorder,
-                                                    backgroundColor: isSelected ? themeColors.accent + '18' : themeColors.card,
-                                                },
-                                            ]}
-                                            onPress={() => pickVersus(rec)}
-                                            activeOpacity={0.82}
-                                            disabled={versusSelected !== null}
+                                            key={opt.value}
+                                            style={[s.goalBtn, active && s.goalBtnActive]}
+                                            onPress={() => setGoal(opt.value)}
+                                            activeOpacity={0.75}
                                         >
-                                            <Text style={[styles.versusTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-                                                {rec.game.title}
+                                            <Text style={[s.goalBtnText, active && s.goalBtnTextActive]}>
+                                                {opt.label}
                                             </Text>
-                                            <Text style={[styles.versusReason, { color: themeColors.textSecondary }]} numberOfLines={3}>
-                                                {rec.reason}
-                                            </Text>
-                                            <View style={[styles.pickButton, { backgroundColor: isSelected ? themeColors.accent : themeColors.accent + '22' }]}>
-                                                <Text style={[styles.pickButtonText, { color: isSelected ? '#fff' : themeColors.accent }]}>
-                                                    {isSelected ? t('ai_versus_picked', language as Language) : t('ai_versus_pick', language as Language)}
-                                                </Text>
-                                            </View>
                                         </TouchableOpacity>
                                     );
                                 })}
                             </View>
-                        </GlassCard>
+                        </ScrollView>
                     </View>
-                )}
+                </View>
 
-                {/* Smart Collections */}
-                {collections.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_smart_collections', language as Language)} icon="albums" iconColor={themeColors.blue} />
-                        {collections.map((collection) => (
-                            <GlassCard key={collection.id} padding={18} style={styles.collectionCard}>
-                                <Text style={[styles.collectionTitle, { color: themeColors.textPrimary }]}>{collection.title}</Text>
-                                <Text style={[styles.collectionDesc, { color: themeColors.textSecondary }]}>{collection.description}</Text>
-                                {collection.games.map((gameRec) => (
-                                    <TouchableOpacity key={gameRec.game.id} onPress={() => router.push(`/game/${gameRec.game.id}`)} activeOpacity={0.82}>
-                                        <View style={[styles.collectionItem, { borderTopColor: themeColors.glassBorder }]}>
-                                            <Text style={[styles.collectionGame, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                                                {gameRec.game.title}
-                                            </Text>
-                                            <Text style={[styles.collectionMeta, { color: themeColors.textMuted }]}>{gameRec.reason}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </GlassCard>
-                        ))}
-                    </View>
-                )}
+                {/* ── Refresh button ── */}
+                <TouchableOpacity style={s.refreshBtn} onPress={loadData} activeOpacity={0.8}>
+                    <Ionicons name="sparkles-outline" size={14} color={ED.copper} />
+                    <Text style={s.refreshBtnText}>Refresh picks</Text>
+                </TouchableOpacity>
 
-                {/* Weekly Plan */}
-                {weeklyPlan && weeklyPlan.items.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_weekly_plan', language as Language)} icon="calendar" iconColor={themeColors.violet} />
-                        <GlassCard padding={18}>
-                            <Text style={[styles.planSummary, { color: themeColors.textSecondary }]}>{weeklyPlan.summary}</Text>
-                            {weeklyPlan.items.map((item) => (
-                                <TouchableOpacity key={item.label + item.recommendation.game.id} onPress={() => router.push(`/game/${item.recommendation.game.id}`)} activeOpacity={0.82}>
-                                    <View style={[styles.planRow, { borderTopColor: themeColors.glassBorder }]}>
-                                        <Text style={[styles.planLabel, { color: themeColors.violet }]}>{item.label}</Text>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.planTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                                                {item.recommendation.game.title}
-                                            </Text>
-                                            <Text style={[styles.planNote, { color: themeColors.textMuted }]}>{item.note}</Text>
+                {/* ── Top match hero ── */}
+                {topRec && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Top match</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.copper }]}>
+                                CONFIDENCE · {topRec.score >= 80 ? 'HIGH' : topRec.score >= 60 ? 'MED' : 'LOW'}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={edStyles.card}
+                            onPress={() => router.push(`/game/${topRec.game.id}` as any)}
+                            activeOpacity={0.85}
+                        >
+                            <View style={{ flexDirection: 'row' }}>
+                                <CoverPlaceholder
+                                    title={topRec.game.title}
+                                    width={120}
+                                    height={170}
+                                    radius={0}
+                                    seed={1}
+                                />
+                                <View style={s.heroContent}>
+                                    <View style={s.heroTop}>
+                                        <View style={s.matchPill}>
+                                            <Text style={s.matchPillText}>{topRec.score}% MATCH</Text>
                                         </View>
                                     </View>
+                                    <Text style={s.heroTitle} numberOfLines={2}>{topRec.game.title}</Text>
+                                    {topRec.game.hltb_main_story ? (
+                                        <Text style={[edStyles.eyebrow, { color: ED.copper, marginTop: 4 }]}>
+                                            {Math.round(topRec.game.hltb_main_story / 3600)}h main
+                                        </Text>
+                                    ) : null}
+                                    <Text style={s.heroReason} numberOfLines={3}>{topRec.reason}</Text>
+                                </View>
+                            </View>
+
+                            {/* Badge row */}
+                            {topRec.badges.length > 0 && (
+                                <View style={s.heroBadges}>
+                                    {topRec.badges.slice(0, 4).map((badge) => (
+                                        <View key={badge} style={edStyles.chip}>
+                                            <Text style={edStyles.chipText}>{badge}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Actions */}
+                            <View style={s.heroActions}>
+                                <TouchableOpacity
+                                    style={[edStyles.btn, edStyles.btnPrimary, { flex: 1, height: 38 }]}
+                                    onPress={() => router.push(`/game/${topRec.game.id}` as any)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="play" size={13} color="#1A1108" />
+                                    <Text style={[edStyles.btnText, edStyles.btnPrimaryText, { fontSize: 13 }]}>Set as next</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </GlassCard>
+                                <TouchableOpacity style={[edStyles.btn, { width: 38, height: 38, paddingHorizontal: 0 }]} onPress={loadData} activeOpacity={0.8}>
+                                    <Ionicons name="refresh-outline" size={14} color={ED.ink2} />
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
                     </View>
                 )}
 
-                {/* Backlog Missions */}
+                {/* ── Other recommendations ── */}
+                {restRecs.length > 0 && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>More picks</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>{restRecs.length} games</Text>
+                        </View>
+                        <View style={edStyles.card}>
+                            {restRecs.map((rec, idx) => (
+                                <TouchableOpacity
+                                    key={rec.game.id}
+                                    style={[s.recRow, idx < restRecs.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
+                                    onPress={() => router.push(`/game/${rec.game.id}` as any)}
+                                    activeOpacity={0.8}
+                                >
+                                    <CoverPlaceholder title={rec.game.title} width={44} height={62} seed={idx + 2} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.recTitle} numberOfLines={1}>{rec.game.title}</Text>
+                                        <Text style={s.recReason} numberOfLines={2}>{rec.reason}</Text>
+                                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                                            {rec.badges.slice(0, 2).map((b) => (
+                                                <View key={b} style={edStyles.pill}>
+                                                    <Text style={edStyles.pillText}>{b}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                    <Text style={s.recScore}>{rec.score}%</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Versus ── */}
+                {versus && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Help me decide</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>VERSUS</Text>
+                        </View>
+                        <Text style={s.versusSub}>Tonight, which feels right?</Text>
+
+                        {versusMsg ? (
+                            <View style={s.versusMsg}>
+                                <Ionicons name="checkmark-circle" size={14} color={ED.moss} />
+                                <Text style={s.versusMsgText}>{versusMsg}</Text>
+                            </View>
+                        ) : null}
+
+                        <View style={s.versusRow}>
+                            <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={s.vsLabel}>vs</Text>
+                            </View>
+                            {[versus.left, versus.right].map((rec, idx) => {
+                                const picked = versusSelected === rec.game.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={rec.game.id}
+                                        style={[
+                                            edStyles.card,
+                                            s.versusCard,
+                                            picked && { borderColor: ED.copper },
+                                        ]}
+                                        onPress={() => pickVersus(rec)}
+                                        activeOpacity={0.8}
+                                        disabled={versusSelected !== null}
+                                    >
+                                        <View style={[s.versusCover, { backgroundColor: coverPaletteFor(rec.game.title, idx + 8).b }]}>
+                                            <View style={[s.versusCoverGlow, { backgroundColor: coverPaletteFor(rec.game.title, idx + 8).a }]} />
+                                            <Text style={s.versusCoverLabel} numberOfLines={2}>{rec.game.title}</Text>
+                                        </View>
+                                        <Text style={s.versusTitle} numberOfLines={2}>{rec.game.title}</Text>
+                                        {rec.game.hltb_main_story ? (
+                                            <Text style={s.versusMeta}>
+                                                {Math.round(rec.game.hltb_main_story / 3600)}h
+                                            </Text>
+                                        ) : null}
+                                        <View style={[s.versusPickBtn, picked && s.versusPickBtnActive]}>
+                                            <Text style={[s.versusPickText, picked && s.versusPickTextActive]}>
+                                                {picked ? 'Picked ✓' : 'This one'}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Smart collections ── */}
+                {collections.length > 0 && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Collections</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>CURATED FOR YOU</Text>
+                        </View>
+                        <View style={{ gap: 10 }}>
+                            {collections.map((col, ci) => (
+                                <View key={col.id} style={edStyles.card}>
+                                    <View style={s.colHeader}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.colTitle}>{col.title}</Text>
+                                            <Text style={s.colSub}>{col.description}</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={14} color={ED.ink3} />
+                                    </View>
+                                    <View style={s.colCovers}>
+                                        {col.games.slice(0, 4).map((gr, gi) => (
+                                            <CoverPlaceholder
+                                                key={gr.game.id}
+                                                title={gr.game.title}
+                                                width={58}
+                                                height={82}
+                                                seed={ci * 5 + gi}
+                                            />
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Daily Pick ── */}
+                {dailyPick && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Daily pick</Text>
+                            <Ionicons name="flash" size={12} color={ED.amber} />
+                        </View>
+                        <TouchableOpacity
+                            style={edStyles.card}
+                            onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}` as any)}
+                            activeOpacity={0.85}
+                        >
+                            <View style={s.dailyInner}>
+                                <CoverPlaceholder
+                                    title={dailyPick.recommendation.game.title}
+                                    width={56}
+                                    height={78}
+                                    seed={0}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.dailyTitle} numberOfLines={1}>{dailyPick.recommendation.game.title}</Text>
+                                    <Text style={s.dailyReason} numberOfLines={2}>{dailyPick.recommendation.reason}</Text>
+                                    <Text style={s.dailyStreak}>{dailyPick.subtitle}</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={14} color={ED.ink3} />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* ── Weekly plan ── */}
+                {weeklyPlan && weeklyPlan.items.length > 0 && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>This week's plan</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.copper, fontFamily: MONO_FONT }]}>
+                                {weeklyPlan.items.length * (sessionHours ?? 2)}H ALLOCATED
+                            </Text>
+                        </View>
+                        <View style={edStyles.card}>
+                            {weeklyPlan.items.map((item, idx) => (
+                                <TouchableOpacity
+                                    key={item.label + item.recommendation.game.id}
+                                    style={[s.planRow, idx < weeklyPlan.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
+                                    onPress={() => router.push(`/game/${item.recommendation.game.id}` as any)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={s.planDay}>
+                                        <Text style={s.planDayLabel}>{item.label}</Text>
+                                        <Text style={s.planDaySub}>{item.note}</Text>
+                                    </View>
+                                    <CoverPlaceholder title={item.recommendation.game.title} width={40} height={56} seed={idx} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.planTitle} numberOfLines={1}>{item.recommendation.game.title}</Text>
+                                        <Text style={s.planNote} numberOfLines={1}>{item.note}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={12} color={ED.ink4} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Missions ── */}
                 {missions.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title={t('ai_missions', language as Language)} icon="flag" iconColor={themeColors.green} />
-                        {missions.map((mission) => (
-                            <TouchableOpacity
-                                key={mission.id}
-                                activeOpacity={mission.gameId ? 0.82 : 1}
-                                onPress={() => mission.gameId ? router.push(`/game/${mission.gameId}`) : undefined}
-                            >
-                                <GlassCard padding={16} style={styles.missionCard}>
-                                    <Text style={[styles.missionTitle, { color: themeColors.textPrimary }]}>{mission.title}</Text>
-                                    <Text style={[styles.missionDesc, { color: themeColors.textSecondary }]}>{mission.description}</Text>
-                                </GlassCard>
-                            </TouchableOpacity>
-                        ))}
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Missions</Text>
+                            <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>
+                                {missions.length} active
+                            </Text>
+                        </View>
+                        <View style={edStyles.card}>
+                            {missions.map((mission, idx) => (
+                                <TouchableOpacity
+                                    key={mission.id}
+                                    style={[s.missionRow, idx < missions.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
+                                    onPress={() => mission.gameId ? router.push(`/game/${mission.gameId}` as any) : undefined}
+                                    activeOpacity={mission.gameId ? 0.8 : 1}
+                                >
+                                    <View style={s.missionIcon}>
+                                        <Ionicons
+                                            name="flag-outline"
+                                            size={14}
+                                            color={ED.copper}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.missionTitle} numberOfLines={1}>
+                                            {mission.title}
+                                        </Text>
+                                        <Text style={s.missionDesc} numberOfLines={1}>{mission.description}</Text>
+                                    </View>
+                                    {mission.gameId && <Ionicons name="chevron-forward" size={12} color={ED.ink4} />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Taste profile ── */}
+                {tasteProfile && (
+                    <View style={s.section}>
+                        <View style={edStyles.sectionHead}>
+                            <Text style={edStyles.eyebrow}>Your taste</Text>
+                            {profileInitialized && (
+                                <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>CALIBRATED</Text>
+                            )}
+                        </View>
+                        <View style={edStyles.card}>
+                            <View style={{ padding: 20 }}>
+                                {profileInitialized ? (
+                                    <>
+                                        <Text style={s.tasteTitle}>"{tasteProfile.title}"</Text>
+                                        <Text style={s.tasteSummary}>{tasteProfile.summary}</Text>
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+                                            {tasteProfile.tags.map((tag) => (
+                                                <View key={tag} style={edStyles.chip}>
+                                                    <Text style={edStyles.chipText}>{tag}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                                        <Ionicons name="bar-chart-outline" size={20} color={ED.copper} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.tasteTitle}>{t('ai_build_profile', language as Language)}</Text>
+                                            <Text style={s.tasteSummary}>{t('ai_build_profile_desc', language as Language)}</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
                     </View>
                 )}
 
@@ -516,85 +600,138 @@ export default function RecommendationsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    root: { flex: 1 },
-    scroll: { paddingTop: 60, paddingHorizontal: 20 },
-    header: { marginBottom: 24 },
-    title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
-    subtitle: { fontSize: 14, marginTop: 4, lineHeight: 20 },
-    section: { marginBottom: 24 },
-    dailyHeader: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-    dailyIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-    dailyTitle: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
-    dailySubtitle: { fontSize: 13, lineHeight: 18 },
-    dailyStreak: { fontSize: 12, fontWeight: '800', marginTop: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-    profileTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
-    profileSummary: { fontSize: 13, lineHeight: 19, marginBottom: 12 },
-    buildProfileRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    focusSwitchCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    focusTextWrap: { flex: 1 },
-    focusTitle: { fontSize: 16, fontWeight: '700' },
-    focusSubtitle: { fontSize: 12, marginTop: 2 },
-    filterLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-    sessionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    sessionChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
-    sessionChipText: { fontSize: 13, fontWeight: '700' },
-    badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 10 },
-    smallBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-    smallBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-    missionCard: { marginBottom: 10 },
-    missionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 5 },
-    missionDesc: { fontSize: 13, lineHeight: 19 },
-    versusPrompt: { fontSize: 16, fontWeight: '800', marginBottom: 14 },
-    versusMsg: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, padding: 10, marginBottom: 12 },
-    versusMsgText: { fontSize: 13, fontWeight: '700' },
-    versusRow: { flexDirection: 'row', gap: 12 },
-    versusCard: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 14 },
-    versusTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
-    versusReason: { fontSize: 12, lineHeight: 18, marginBottom: 14 },
-    pickButton: { height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    pickButtonText: { fontSize: 12, fontWeight: '800' },
-    collectionCard: { marginBottom: 12 },
-    collectionTitle: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
-    collectionDesc: { fontSize: 12, lineHeight: 18, marginBottom: 8 },
-    collectionItem: { paddingTop: 10, marginTop: 10, borderTopWidth: 1 },
-    collectionGame: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-    collectionMeta: { fontSize: 12, lineHeight: 17 },
-    planSummary: { fontSize: 13, lineHeight: 18, marginBottom: 8 },
-    planRow: { flexDirection: 'row', gap: 12, paddingTop: 12, marginTop: 12, borderTopWidth: 1 },
-    planLabel: { width: 34, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-    planTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-    planNote: { fontSize: 12, lineHeight: 17 },
-    applyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: 14, marginBottom: 24 },
-    applyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-    recWrapper: { marginBottom: 20 },
-    reasonCard: {
-        alignSelf: 'stretch',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 10,
-        marginBottom: -12,
-        marginHorizontal: 12,
-        zIndex: 10,
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+const s = StyleSheet.create({
+    root: { flex: 1, backgroundColor: ED.bg },
+    scroll: { paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingHorizontal: 24 },
+    header: { marginBottom: 20 },
+    headerSub: { fontSize: 13, color: ED.ink3, marginTop: 8, lineHeight: 20 },
+
+    moodScroll: { flexDirection: 'row', gap: 6, paddingHorizontal: 24, paddingBottom: 20 },
+    chip: {
+        flexDirection: 'row' as const, alignItems: 'center' as const,
+        height: 32, paddingHorizontal: 14, gap: 4,
+        borderRadius: 100, backgroundColor: ED.surface2,
+        borderWidth: 1, borderColor: ED.line,
     },
-    reasonContent: { flex: 1, gap: 8 },
-    reasonText: { fontSize: 12, fontWeight: '600', lineHeight: 18, flex: 1 },
-    whyNotText: { fontSize: 11, lineHeight: 16 },
-    paywallHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-    paywallTitle: { fontSize: 18, fontWeight: '800', flex: 1 },
-    paywallSubtitle: { fontSize: 13, marginBottom: 14 },
-    benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-    benefitText: { fontSize: 13, flex: 1 },
-    paywallBtn: { marginTop: 16, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-    paywallBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-    paywallOverlay: { flex: 1, backgroundColor: '#00000088', justifyContent: 'center', alignItems: 'center', padding: 24 },
-    paywallModal: { width: '100%', borderRadius: 24, borderWidth: 1, padding: 24, overflow: 'hidden' },
+    chipActive: { backgroundColor: ED.copperBg, borderColor: ED.copperLine },
+    chipText: { fontSize: 12.5, fontWeight: '500' as const, color: ED.ink2, letterSpacing: -0.1 },
+    chipTextActive: { color: ED.copper },
+
+    filterRow: { gap: 10, marginBottom: 16 },
+    filterCard: { padding: 14 },
+    sessionBtns: { flexDirection: 'row', gap: 4 },
+    sessionBtn: {
+        flex: 1, height: 30, borderRadius: 8,
+        borderWidth: 1, borderColor: ED.line,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    sessionBtnActive: { backgroundColor: ED.ink, borderColor: ED.ink },
+    sessionBtnText: { fontFamily: MONO_FONT, fontSize: 11, fontWeight: '600', color: ED.ink2 },
+    sessionBtnTextActive: { color: ED.bg },
+    goalBtn: {
+        height: 28, paddingHorizontal: 10, borderRadius: 8,
+        borderWidth: 1, borderColor: ED.line,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    goalBtnActive: { backgroundColor: ED.copperBg, borderColor: ED.copperLine },
+    goalBtnText: { fontSize: 12, fontWeight: '500', color: ED.ink2 },
+    goalBtnTextActive: { color: ED.copper },
+
+    refreshBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 6, height: 38, borderRadius: 10,
+        borderWidth: 1, borderColor: ED.copperLine,
+        backgroundColor: ED.copperBg, marginBottom: 28,
+    },
+    refreshBtnText: { fontSize: 13, fontWeight: '600', color: ED.copper },
+
+    section: { marginBottom: 28 },
+
+    heroContent: { flex: 1, padding: 14, justifyContent: 'space-between' },
+    heroTop: { flexDirection: 'row', justifyContent: 'flex-end' },
+    matchPill: {
+        backgroundColor: ED.copper, borderRadius: 4,
+        paddingHorizontal: 7, paddingVertical: 3,
+    },
+    matchPillText: { fontFamily: MONO_FONT, fontSize: 9, fontWeight: '700', color: '#1A1108' },
+    heroTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.6, color: ED.ink, marginTop: 6 },
+    heroReason: { fontSize: 12, color: ED.ink2, lineHeight: 18, marginTop: 6 },
+    heroBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 12, borderTopWidth: 1, borderTopColor: ED.line },
+    heroActions: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: ED.line },
+
+    recRow: { flexDirection: 'row', gap: 12, padding: 14, alignItems: 'center' },
+    recTitle: { fontSize: 14, fontWeight: '700', color: ED.ink, letterSpacing: -0.3, marginBottom: 3 },
+    recReason: { fontSize: 12, color: ED.ink2, lineHeight: 17 },
+    recScore: { fontFamily: MONO_FONT, fontSize: 12, fontWeight: '700', color: ED.copper, minWidth: 34, textAlign: 'right' },
+
+    versusSub: { fontSize: 13, color: ED.ink3, marginBottom: 12 },
+    versusRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+    versusCard: { flex: 1, padding: 10 },
+    vsLabel: {
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        fontSize: 16, fontWeight: '700', color: ED.ink3, fontStyle: 'italic',
+    },
+    versusCover: {
+        width: '100%', height: 110, borderRadius: 6,
+        overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+    },
+    versusCoverGlow: {
+        position: 'absolute', bottom: -20, right: -20,
+        width: 80, height: 80, borderRadius: 40, opacity: 0.5,
+    },
+    versusCoverLabel: {
+        fontFamily: MONO_FONT, fontSize: 9, fontWeight: '600',
+        color: ED.ink3, textAlign: 'center', paddingHorizontal: 8,
+        letterSpacing: 0.5, textTransform: 'uppercase',
+    },
+    versusTitle: { fontSize: 13, fontWeight: '600', color: ED.ink, marginTop: 8, letterSpacing: -0.2 },
+    versusMeta: { fontFamily: MONO_FONT, fontSize: 10, color: ED.ink3, marginTop: 3 },
+    versusPickBtn: {
+        marginTop: 10, height: 30, borderRadius: 8,
+        borderWidth: 1, borderColor: ED.copperLine,
+        backgroundColor: ED.copperBg,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    versusPickBtnActive: { backgroundColor: ED.copper, borderColor: ED.copper },
+    versusPickText: { fontSize: 11, fontWeight: '700', color: ED.copper },
+    versusPickTextActive: { color: '#1A1108' },
+    versusMsg: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingVertical: 8, paddingHorizontal: 12,
+        borderRadius: 8, backgroundColor: ED.mossBg,
+        marginBottom: 10,
+    },
+    versusMsgText: { fontSize: 12, fontWeight: '600', color: ED.moss },
+
+    colHeader: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, paddingBottom: 10 },
+    colTitle: { fontSize: 16, fontWeight: '700', color: ED.ink, letterSpacing: -0.4 },
+    colSub: { fontSize: 11, color: ED.ink3, marginTop: 2 },
+    colCovers: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingBottom: 14 },
+
+    dailyInner: { flexDirection: 'row', gap: 12, padding: 14, alignItems: 'center' },
+    dailyTitle: { fontSize: 15, fontWeight: '700', color: ED.ink, letterSpacing: -0.3, marginBottom: 3 },
+    dailyReason: { fontSize: 12, color: ED.ink2, lineHeight: 17, marginBottom: 4 },
+    dailyStreak: { fontFamily: MONO_FONT, fontSize: 10, fontWeight: '600', color: ED.amber, letterSpacing: 0.4, textTransform: 'uppercase' },
+
+    planRow: { flexDirection: 'row', gap: 12, padding: 14, alignItems: 'center' },
+    planDay: { width: 40 },
+    planDayLabel: { fontFamily: MONO_FONT, fontSize: 11, fontWeight: '600', color: ED.copper },
+    planDaySub: { fontFamily: MONO_FONT, fontSize: 9, color: ED.ink3, marginTop: 2 },
+    planTitle: { fontSize: 13.5, fontWeight: '600', color: ED.ink, letterSpacing: -0.2, marginBottom: 2 },
+    planNote: { fontSize: 11, color: ED.ink3, fontStyle: 'italic' },
+
+    missionRow: { flexDirection: 'row', gap: 12, padding: 14, alignItems: 'center' },
+    missionIcon: {
+        width: 32, height: 32, borderRadius: 8,
+        backgroundColor: ED.surface2,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    missionTitle: { fontSize: 13, fontWeight: '600', color: ED.ink, letterSpacing: -0.2, marginBottom: 2 },
+    missionDesc: { fontSize: 11, color: ED.ink3 },
+
+    tasteTitle: {
+        fontSize: 22, fontStyle: 'italic', fontWeight: '700',
+        color: ED.ink, letterSpacing: -0.5, lineHeight: 26,
+    },
+    tasteSummary: { fontSize: 13, color: ED.ink2, marginTop: 10, lineHeight: 20 },
 });

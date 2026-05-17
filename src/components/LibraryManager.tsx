@@ -5,17 +5,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../hooks/useAppContext';
-import { GlassCard } from './GlassCard';
-import { SectionHeader } from './SectionHeader';
 import { PlatformLoginModal } from './PlatformLoginModal';
 import { PLATFORM_CONFIG, ImportPlatform, PlatformConnection } from '../types';
 import { getSetting, getGameCountByPlatform } from '../database/queries';
 import { t } from '../i18n';
+import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 interface LibraryManagerProps {
   onImportComplete?: () => void;
@@ -34,9 +31,8 @@ function formatTimeSince(iso: string | null, lang: string): string {
 }
 
 export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
-  const { themeColors, language } = useAppContext();
+  const { language } = useAppContext();
   const lang = language ?? 'en';
-  const styles = getStyles(themeColors);
 
   const [connections, setConnections] = useState<Partial<Record<ImportPlatform, PlatformConnection>>>({
     steam: { platform: 'steam', connected: false, lastSynced: null },
@@ -45,8 +41,8 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
 
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [loginPlatform, setLoginPlatform] = useState<ImportPlatform>('gog');
-  const [importing, setImporting] = useState<ImportPlatform | null>(null);
-  const [importResult, setImportResult] = useState<{ platform: ImportPlatform; message: string; isError: boolean } | null>(null);
+  const [importing] = useState<ImportPlatform | null>(null);
+  const [importResult] = useState<{ platform: ImportPlatform; message: string; isError: boolean } | null>(null);
 
   const refreshConnections = useCallback(() => {
     const steamId = getSetting('steam_id');
@@ -68,11 +64,8 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
     });
   }, []);
 
-  useEffect(() => {
-    refreshConnections();
-  }, [refreshConnections]);
+  useEffect(() => { refreshConnections(); }, [refreshConnections]);
 
-  // Refresh when modal closes (games may have been added manually)
   const handleModalClose = () => {
     setLoginModalVisible(false);
     refreshConnections();
@@ -83,12 +76,7 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
 
   return (
     <View>
-      <SectionHeader
-        title={lang === 'es' ? 'Bibliotecas de Juegos' : 'Game Libraries'}
-        icon="library"
-        iconColor={themeColors.accent}
-      />
-      <GlassCard padding={0}>
+      <View style={edStyles.card}>
         {platforms.map((platform, index) => {
           const config = PLATFORM_CONFIG[platform];
           const conn = connections[platform] ?? { platform, connected: false, lastSynced: null };
@@ -101,34 +89,25 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
             <View
               key={platform}
               style={[
-                styles.row,
-                index < platforms.length - 1 && {
-                  borderBottomWidth: 1,
-                  borderBottomColor: themeColors.glassBorder,
-                },
+                s.row,
+                index < platforms.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
               ]}
             >
-              {/* Platform icon */}
-              <View style={[styles.platformIcon, { backgroundColor: config.color + '22' }]}>
+              <View style={[s.platformIcon, { backgroundColor: config.color + '22' }]}>
                 <Ionicons
                   name={config.icon as keyof typeof Ionicons.glyphMap}
-                  size={20}
+                  size={18}
                   color={config.color}
                 />
               </View>
 
-              <View style={styles.platformInfo}>
-                <Text style={[styles.platformName, { color: themeColors.textPrimary }]}>
-                  {config.label}
-                </Text>
+              <View style={s.platformInfo}>
+                <Text style={s.platformName}>{config.label}</Text>
 
                 {isSteam ? (
-                  /* Steam: show sync status */
-                  <View style={styles.statusRow}>
-                    <View style={[styles.statusDot, {
-                      backgroundColor: conn.connected ? themeColors.green : themeColors.textMuted,
-                    }]} />
-                    <Text style={[styles.statusText, { color: themeColors.textMuted }]}>
+                  <View style={s.statusRow}>
+                    <View style={[s.statusDot, { backgroundColor: conn.connected ? ED.moss : ED.ink4 }]} />
+                    <Text style={s.statusText}>
                       {conn.connected
                         ? conn.lastSynced
                           ? (lang === 'es' ? `Sincronizado ${formatTimeSince(conn.lastSynced, lang)}` : `Synced ${formatTimeSince(conn.lastSynced, lang)}`)
@@ -137,68 +116,50 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
                     </Text>
                   </View>
                 ) : (
-                  /* GOG / Epic: always show game count, no connected status */
-                  <Text style={[styles.statusText, { color: themeColors.textMuted }]}>
+                  <Text style={s.statusText}>
                     {count} {t('lib_games_added', lang as any)}
                   </Text>
                 )}
               </View>
 
-              {/* Actions */}
-              <View style={styles.actions}>
+              <View style={s.actions}>
                 {isSteam ? (
-                  <View style={[styles.steamTag, {
-                    backgroundColor: themeColors.glass,
-                    borderColor: themeColors.glassBorder,
-                  }]}>
-                    <Text style={[styles.steamTagText, { color: themeColors.textMuted }]}>
-                      API Key
-                    </Text>
+                  <View style={s.tag}>
+                    <Text style={s.tagText}>API KEY</Text>
                   </View>
                 ) : (
-                  /* GOG / Epic: "Manual — why?" opens the info modal */
                   <TouchableOpacity
-                    style={[styles.manualBtn, {
-                      borderColor: config.color + '55',
-                      backgroundColor: config.color + '15',
-                    }]}
-                    onPress={() => {
-                      setLoginPlatform(platform);
-                      setLoginModalVisible(true);
-                    }}
+                    style={[s.manualBtn, { borderColor: config.color + '55', backgroundColor: config.color + '15' }]}
+                    onPress={() => { setLoginPlatform(platform); setLoginModalVisible(true); }}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="help-circle-outline" size={13} color={config.color} />
-                    <Text style={[styles.manualBtnText, { color: config.color }]}>
+                    <Ionicons name="help-circle-outline" size={12} color={config.color} />
+                    <Text style={[s.manualBtnText, { color: config.color }]}>
                       {t('lib_manual_why', lang as any)}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* Import progress */}
               {isImporting && (
-                <View style={styles.progressOverlay}>
-                  <ActivityIndicator size="small" color={themeColors.teal} />
+                <View style={s.progressOverlay}>
+                  <ActivityIndicator size="small" color={ED.copper} />
                 </View>
               )}
 
-              {/* Result chip */}
               {result && (
                 <View style={[
-                  styles.resultChip,
+                  s.resultChip,
                   result.isError
-                    ? { borderColor: themeColors.red + '55', backgroundColor: themeColors.red + '11' }
-                    : { borderColor: themeColors.green + '55', backgroundColor: themeColors.green + '11' },
+                    ? { borderColor: ED.rust + '55', backgroundColor: ED.rust + '11' }
+                    : { borderColor: ED.moss + '55', backgroundColor: ED.moss + '11' },
                 ]}>
                   <Ionicons
                     name={result.isError ? 'close-circle' : 'checkmark-circle'}
                     size={12}
-                    color={result.isError ? themeColors.red : themeColors.green}
+                    color={result.isError ? ED.rust : ED.moss}
                   />
-                  <Text style={[styles.resultText, {
-                    color: result.isError ? themeColors.red : themeColors.green,
-                  }]}>
+                  <Text style={[s.resultText, { color: result.isError ? ED.rust : ED.moss }]}>
                     {result.message}
                   </Text>
                 </View>
@@ -206,7 +167,7 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
             </View>
           );
         })}
-      </GlassCard>
+      </View>
 
       <PlatformLoginModal
         visible={loginModalVisible}
@@ -218,89 +179,35 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
   );
 }
 
-const getStyles = (themeColors: any) =>
-  StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      gap: 12,
-      flexWrap: 'wrap',
-    },
-    platformIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    platformInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    platformName: {
-      fontSize: 15,
-      fontWeight: '700',
-    },
-    statusRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    statusDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-    },
-    statusText: {
-      fontSize: 12,
-    },
-    actions: {
-      flexDirection: 'row',
-      gap: 6,
-    },
-    manualBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      height: 32,
-      paddingHorizontal: 10,
-      borderRadius: 10,
-      borderWidth: 1,
-    },
-    manualBtnText: {
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    steamTag: {
-      height: 28,
-      paddingHorizontal: 10,
-      borderRadius: 8,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    steamTagText: {
-      fontSize: 11,
-      fontWeight: '600',
-    },
-    progressOverlay: {
-      width: '100%',
-      alignItems: 'center',
-      paddingVertical: 4,
-    },
-    resultChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      padding: 8,
-      width: '100%',
-      marginTop: 4,
-    },
-    resultText: {
-      fontSize: 12,
-      flex: 1,
-    },
-  });
+const s = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, flexWrap: 'wrap',
+  },
+  platformIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  platformInfo: { flex: 1, gap: 3 },
+  platformName: { fontSize: 14, fontWeight: '700', color: ED.ink },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, color: ED.ink3 },
+  actions: { flexDirection: 'row', gap: 6 },
+  manualBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 28, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1,
+  },
+  manualBtnText: { fontSize: 11, fontWeight: '700' },
+  tag: {
+    height: 26, paddingHorizontal: 9, borderRadius: 6,
+    borderWidth: 1, borderColor: ED.line, backgroundColor: ED.surface2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tagText: { fontFamily: MONO_FONT, fontSize: 9, fontWeight: '600', color: ED.ink3, letterSpacing: 0.8 },
+  progressOverlay: { width: '100%', alignItems: 'center', paddingVertical: 4 },
+  resultChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 8, borderWidth: 1, padding: 8, width: '100%', marginTop: 4,
+  },
+  resultText: { fontSize: 11, flex: 1 },
+});

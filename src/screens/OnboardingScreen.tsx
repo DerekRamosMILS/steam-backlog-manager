@@ -9,368 +9,169 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { useAppContext } from '../hooks/useAppContext';
 import { setSetting } from '../database/queries';
 import { t, Language } from '../i18n';
 import { TutorialOverlay } from '../components/TutorialOverlay';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const DARK = {
-  bg: '#0a0a14',
-  card: '#12121f',
-  accent: '#6366f1',
-  violet: '#8b5cf6',
-  teal: '#14b8a6',
-  orange: '#f97316',
-  textPrimary: '#f0f0f0',
-  textSecondary: '#a0a0b8',
-  textMuted: '#606078',
-  glassBorder: '#ffffff18',
-};
+import { ED, MONO_FONT } from '../styles/editorial';
 
 interface Props {
   onComplete: () => void;
 }
 
-// 0: Language, 1: Welcome, 2: Features (core), 3: Features (new), 4: Name, 5: Import, 6: Tour invite
 const TOTAL_STEPS = 7;
 
 export default function OnboardingScreen({ onComplete }: Props) {
-  const { themeColors } = useAppContext();
-  const C = themeColors ?? DARK;
-
-  const [currentStep, setCurrentStep] = useState(0);
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
+  const [step, setStep] = useState(0);
+  const [lang, setLang] = useState<Language>('en');
   const [playerName, setPlayerName] = useState('');
   const [showTutorial, setShowTutorial] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const animateToStep = (next: number) => {
     Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 160,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
     ]).start();
-    setTimeout(() => setCurrentStep(next), 160);
+    setTimeout(() => setStep(next), 160);
   };
 
-  const goNext = () => {
-    if (currentStep < TOTAL_STEPS - 1) {
-      animateToStep(currentStep + 1);
-    }
-  };
+  const goNext = () => { if (step < TOTAL_STEPS - 1) animateToStep(step + 1); };
 
-  const handleComplete = async () => {
+  const handleComplete = () => {
     setSetting('onboarding_completed', 'true');
     setSetting('player_name', playerName.trim() || 'Player');
-    setSetting('app_language', selectedLanguage);
+    setSetting('app_language', lang);
     onComplete();
   };
 
-  const lang = selectedLanguage;
-
-  // ── Step Dots ───────────────────────────────────────────────
   const renderDots = () => {
-    if (currentStep === 0) return null;
+    if (step === 0) return null;
     return (
-      <View style={styles.dotsRow}>
-        {Array.from({ length: TOTAL_STEPS - 1 }).map((_, i) => {
-          const active = i === currentStep - 1;
-          return (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: active ? C.accent : DARK.textMuted,
-                  width: active ? 20 : 8,
-                },
-              ]}
-            />
-          );
-        })}
+      <View style={s.dotsRow}>
+        {Array.from({ length: TOTAL_STEPS - 1 }).map((_, i) => (
+          <View key={i} style={[s.dot, i === step - 1 && s.dotActive]} />
+        ))}
       </View>
     );
   };
 
-  // ── Step 0: Language ─────────────────────────────────────────
   const renderLanguageStep = () => (
-    <View style={styles.stepContainer}>
-      <View style={[styles.iconCircle, { backgroundColor: C.accent + '22', borderColor: C.accent + '44' }]}>
-        <Ionicons name="globe-outline" size={48} color={C.accent} />
+    <View style={s.stepWrap}>
+      <View style={s.iconRing}>
+        <Ionicons name="globe-outline" size={26} color={ED.copper} />
       </View>
-
-      <Text style={[styles.title, { color: C.textPrimary }]}>
-        {t('onb_lang_title', lang)}
-      </Text>
-      <Text style={[styles.subtitle, { color: C.textSecondary }]}>
-        {t('onb_lang_subtitle', lang)}
-      </Text>
-
-      <View style={styles.langRow}>
-        <TouchableOpacity
-          style={[
-            styles.langCard,
-            {
-              backgroundColor: selectedLanguage === 'en'
-                ? C.accent + '22'
-                : C.card,
-              borderColor: selectedLanguage === 'en' ? C.accent : DARK.glassBorder,
-            },
-          ]}
-          onPress={() => setSelectedLanguage('en')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.langFlag}>🇺🇸</Text>
-          <Text style={[styles.langLabel, { color: C.textPrimary }]}>
-            {t('onb_lang_en', lang)}
-          </Text>
-          {selectedLanguage === 'en' && (
-            <Ionicons name="checkmark-circle" size={20} color={C.accent} style={styles.langCheck} />
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.langCard,
-            {
-              backgroundColor: selectedLanguage === 'es'
-                ? C.violet + '22'
-                : C.card,
-              borderColor: selectedLanguage === 'es' ? C.violet : DARK.glassBorder,
-            },
-          ]}
-          onPress={() => setSelectedLanguage('es')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.langFlag}>🇲🇽</Text>
-          <Text style={[styles.langLabel, { color: C.textPrimary }]}>
-            {t('onb_lang_es', lang)}
-          </Text>
-          {selectedLanguage === 'es' && (
-            <Ionicons name="checkmark-circle" size={20} color={C.violet} style={styles.langCheck} />
-          )}
-        </TouchableOpacity>
+      <Text style={s.bigTitle}>{t('onb_lang_title', lang)}</Text>
+      <Text style={s.sub}>{t('onb_lang_subtitle', lang)}</Text>
+      <View style={s.langRow}>
+        {(['en', 'es'] as Language[]).map((lc) => {
+          const active = lang === lc;
+          return (
+            <TouchableOpacity
+              key={lc}
+              style={[s.langCard, active && s.langCardActive]}
+              onPress={() => setLang(lc)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 34 }}>{lc === 'en' ? '🇺🇸' : '🇲🇽'}</Text>
+              <Text style={[s.langLabel, active && { color: ED.copper }]}>
+                {t(lc === 'en' ? 'onb_lang_en' : 'onb_lang_es', lang)}
+              </Text>
+              {active && <Ionicons name="checkmark-circle" size={18} color={ED.copper} />}
+            </TouchableOpacity>
+          );
+        })}
       </View>
-
-      <TouchableOpacity
-        style={[styles.ctaButton, { backgroundColor: C.accent }]}
-        onPress={goNext}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.ctaText}>{t('onb_lang_continue', lang)}</Text>
+      <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+        <Text style={s.ctaText}>{t('onb_lang_continue', lang)}</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // ── Step 1: Welcome ──────────────────────────────────────────
   const renderWelcomeStep = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.stepContainer}>
-        <View style={[styles.iconCircle, { backgroundColor: C.accent + '22', borderColor: C.accent + '44' }]}>
-          <Ionicons name="game-controller-outline" size={48} color={C.accent} />
-        </View>
-
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          {t('onb_welcome_title', lang)}
-        </Text>
-
-        <View style={[styles.bodyCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}>
-          <Text style={[styles.bodyText, { color: C.textSecondary }]}>
-            {t('onb_welcome_body', lang)}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.accent }]}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.ctaText}>{t('onb_welcome_cta', lang)}</Text>
-        </TouchableOpacity>
+    <ScrollView contentContainerStyle={s.stepWrap} showsVerticalScrollIndicator={false}>
+      <View style={s.iconRing}>
+        <Ionicons name="game-controller-outline" size={26} color={ED.copper} />
       </View>
+      <Text style={s.bigTitle}>{t('onb_welcome_title', lang)}</Text>
+      <View style={s.bodyCard}>
+        <Text style={s.bodyText}>{t('onb_welcome_body', lang)}</Text>
+      </View>
+      <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+        <Text style={s.ctaText}>{t('onb_welcome_cta', lang)}</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 
-  // ── Step 2: Features ─────────────────────────────────────────
   const FEATURES = [
-    {
-      icon: 'sparkles' as const,
-      color: C.violet,
-      titleKey: 'onb_feat_ai_title' as const,
-      descKey: 'onb_feat_ai_desc' as const,
-    },
-    {
-      icon: 'time-outline' as const,
-      color: C.teal,
-      titleKey: 'onb_feat_hltb_title' as const,
-      descKey: 'onb_feat_hltb_desc' as const,
-    },
-    {
-      icon: 'stats-chart-outline' as const,
-      color: C.orange,
-      titleKey: 'onb_feat_session_title' as const,
-      descKey: 'onb_feat_session_desc' as const,
-    },
-    {
-      icon: 'calendar-outline' as const,
-      color: C.accent,
-      titleKey: 'onb_feat_planner_title' as const,
-      descKey: 'onb_feat_planner_desc' as const,
-    },
+    { icon: 'sparkles' as const, color: ED.plum, titleKey: 'onb_feat_ai_title' as const, descKey: 'onb_feat_ai_desc' as const },
+    { icon: 'time-outline' as const, color: ED.sky, titleKey: 'onb_feat_hltb_title' as const, descKey: 'onb_feat_hltb_desc' as const },
+    { icon: 'stats-chart-outline' as const, color: ED.moss, titleKey: 'onb_feat_session_title' as const, descKey: 'onb_feat_session_desc' as const },
+    { icon: 'calendar-outline' as const, color: ED.copper, titleKey: 'onb_feat_planner_title' as const, descKey: 'onb_feat_planner_desc' as const },
+  ];
+
+  const NEW_FEATURES = [
+    { icon: 'wallet-outline' as const, color: ED.sky, titleKey: 'onb_feat_value_title' as const, descKey: 'onb_feat_value_desc' as const },
+    { icon: 'flame-outline' as const, color: ED.rust, titleKey: 'onb_feat_shame_title' as const, descKey: 'onb_feat_shame_desc' as const },
+    { icon: 'cart-outline' as const, color: ED.amber, titleKey: 'onb_feat_advisor_title' as const, descKey: 'onb_feat_advisor_desc' as const },
   ];
 
   const renderFeaturesStep = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.stepContainer}>
-        <Text style={[styles.title, { color: C.textPrimary, marginTop: 8 }]}>
-          {t('onb_features_title', lang)}
-        </Text>
-
-        <View style={styles.featuresGrid}>
-          {FEATURES.map((f) => (
-            <View
-              key={f.titleKey}
-              style={[styles.featureCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}
-            >
-              <View style={[styles.featureIconWrap, { backgroundColor: f.color + '22' }]}>
-                <Ionicons name={f.icon} size={24} color={f.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.featureTitle, { color: C.textPrimary }]}>
-                  {t(f.titleKey, lang)}
-                </Text>
-                <Text style={[styles.featureDesc, { color: C.textSecondary }]}>
-                  {t(f.descKey, lang)}
-                </Text>
-              </View>
+    <ScrollView contentContainerStyle={s.stepWrap} showsVerticalScrollIndicator={false}>
+      <Text style={[s.bigTitle, { marginTop: 8 }]}>{t('onb_features_title', lang)}</Text>
+      <View style={s.featGrid}>
+        {FEATURES.map((f) => (
+          <View key={f.titleKey} style={s.featCard}>
+            <View style={[s.featIcon, { backgroundColor: f.color + '22' }]}>
+              <Ionicons name={f.icon} size={20} color={f.color} />
             </View>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.accent }]}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.ctaText}>{t('onb_features_cta', lang)}</Text>
-        </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.featTitle}>{t(f.titleKey, lang)}</Text>
+              <Text style={s.featDesc}>{t(f.descKey, lang)}</Text>
+            </View>
+          </View>
+        ))}
       </View>
+      <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+        <Text style={s.ctaText}>{t('onb_features_cta', lang)}</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
-
-  // ── Step 3: New Features ─────────────────────────────────────
-  const NEW_FEATURES = [
-    {
-      icon: 'wallet-outline' as const,
-      color: C.teal,
-      titleKey: 'onb_feat_value_title' as const,
-      descKey: 'onb_feat_value_desc' as const,
-    },
-    {
-      icon: 'flame-outline' as const,
-      color: '#ff6535',
-      titleKey: 'onb_feat_shame_title' as const,
-      descKey: 'onb_feat_shame_desc' as const,
-    },
-    {
-      icon: 'cart-outline' as const,
-      color: C.orange,
-      titleKey: 'onb_feat_advisor_title' as const,
-      descKey: 'onb_feat_advisor_desc' as const,
-    },
-  ];
 
   const renderNewFeaturesStep = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.stepContainer}>
-        <Text style={[styles.title, { color: C.textPrimary, marginTop: 8 }]}>
-          {t('onb_features2_title', lang)}
-        </Text>
-
-        <View style={styles.featuresGrid}>
-          {NEW_FEATURES.map((f) => (
-            <View
-              key={f.titleKey}
-              style={[styles.featureCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}
-            >
-              <View style={[styles.featureIconWrap, { backgroundColor: f.color + '22' }]}>
-                <Ionicons name={f.icon} size={24} color={f.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.featureTitle, { color: C.textPrimary }]}>
-                  {t(f.titleKey, lang)}
-                </Text>
-                <Text style={[styles.featureDesc, { color: C.textSecondary }]}>
-                  {t(f.descKey, lang)}
-                </Text>
-              </View>
+    <ScrollView contentContainerStyle={s.stepWrap} showsVerticalScrollIndicator={false}>
+      <Text style={[s.bigTitle, { marginTop: 8 }]}>{t('onb_features2_title', lang)}</Text>
+      <View style={s.featGrid}>
+        {NEW_FEATURES.map((f) => (
+          <View key={f.titleKey} style={s.featCard}>
+            <View style={[s.featIcon, { backgroundColor: f.color + '22' }]}>
+              <Ionicons name={f.icon} size={20} color={f.color} />
             </View>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.accent }]}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.ctaText}>{t('onb_features2_cta', lang)}</Text>
-        </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.featTitle}>{t(f.titleKey, lang)}</Text>
+              <Text style={s.featDesc}>{t(f.descKey, lang)}</Text>
+            </View>
+          </View>
+        ))}
       </View>
+      <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+        <Text style={s.ctaText}>{t('onb_features2_cta', lang)}</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 
-  // ── Step 4: Player Name ──────────────────────────────────────
   const renderNameStep = () => (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.stepContainer}>
-        <View style={[styles.iconCircle, { backgroundColor: C.teal + '22', borderColor: C.teal + '44' }]}>
-          <Ionicons name="person-circle-outline" size={48} color={C.teal} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={s.stepWrap}>
+        <View style={[s.iconRing, { backgroundColor: ED.skyBg, borderColor: ED.sky + '44' }]}>
+          <Ionicons name="person-circle-outline" size={26} color={ED.sky} />
         </View>
-
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          {t('onb_name_title', lang)}
-        </Text>
-
+        <Text style={s.bigTitle}>{t('onb_name_title', lang)}</Text>
         <TextInput
-          style={[
-            styles.nameInput,
-            {
-              backgroundColor: C.card,
-              borderColor: playerName.length > 0 ? C.accent : DARK.glassBorder,
-              color: C.textPrimary,
-            },
-          ]}
+          style={s.nameInput}
           placeholder={t('onb_name_placeholder', lang)}
-          placeholderTextColor={DARK.textMuted}
+          placeholderTextColor={ED.ink4}
           value={playerName}
           onChangeText={setPlayerName}
           autoCorrect={false}
@@ -379,140 +180,78 @@ export default function OnboardingScreen({ onComplete }: Props) {
           returnKeyType="done"
           onSubmitEditing={goNext}
         />
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.accent }]}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.ctaText}>{t('onb_name_cta', lang)}</Text>
+        <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+          <Text style={s.ctaText}>{t('onb_name_cta', lang)}</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={goNext} style={styles.skipButton}>
-          <Text style={[styles.skipText, { color: C.textMuted }]}>
-            {t('onb_name_skip', lang)}
-          </Text>
+        <TouchableOpacity onPress={goNext} style={s.skipBtn}>
+          <Text style={s.skipText}>{t('onb_name_skip', lang)}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 
-  // ── Step 4: Import ───────────────────────────────────────────
   const renderImportStep = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.stepContainer}>
-        <View style={[styles.iconCircle, { backgroundColor: C.orange + '22', borderColor: C.orange + '44' }]}>
-          <Ionicons name="cloud-download-outline" size={48} color={C.orange} />
-        </View>
-
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          {t('onb_import_title', lang)}
-        </Text>
-
-        <View style={[styles.bodyCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}>
-          <Text style={[styles.bodyText, { color: C.textSecondary }]}>
-            {t('onb_import_body', lang)}
-          </Text>
-        </View>
-
-        {/* Demo: Add Game card */}
-        <View style={[styles.demoCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}>
-          <View style={[styles.demoHeader, { borderBottomColor: DARK.glassBorder }]}>
-            <Ionicons name="add-circle-outline" size={18} color={C.accent} />
-            <Text style={[styles.demoHeaderText, { color: C.textPrimary }]}>
-              {t('onb_import_manual_title', lang)}
-            </Text>
-          </View>
-
-          {/* Mock search input */}
-          <View style={[styles.demoSearchBar, { backgroundColor: DARK.bg, borderColor: C.accent + '55' }]}>
-            <Ionicons name="search-outline" size={16} color={DARK.textMuted} />
-            <Text style={[styles.demoSearchText, { color: C.accent }]}>
-              The Witcher 3
-            </Text>
-            <View style={[styles.demoCursor, { backgroundColor: C.accent }]} />
-          </View>
-
-          {/* Mock suggestion */}
-          <View style={[styles.demoSuggestion, { backgroundColor: C.accent + '15', borderColor: C.accent + '33' }]}>
-            <View style={[styles.demoGameIcon, { backgroundColor: C.violet + '33' }]}>
-              <Ionicons name="game-controller-outline" size={16} color={C.violet} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[styles.demoGameTitle, { color: C.textPrimary }]}>
-                The Witcher 3: Wild Hunt
-              </Text>
-              <Text style={[styles.demoGameMeta, { color: C.textMuted }]}>
-                PC  •  ~50h  •  RPG
-              </Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={18} color={C.teal} />
-          </View>
-
-          <Text style={[styles.demoDesc, { color: C.textSecondary }]}>
-            {t('onb_import_manual_desc', lang)}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.accent }]}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="play-circle-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.ctaText}>{t('onb_import_cta', lang)}</Text>
-        </TouchableOpacity>
+    <ScrollView contentContainerStyle={s.stepWrap} showsVerticalScrollIndicator={false}>
+      <View style={[s.iconRing, { backgroundColor: ED.amberBg, borderColor: ED.amber + '44' }]}>
+        <Ionicons name="cloud-download-outline" size={26} color={ED.amber} />
       </View>
+      <Text style={s.bigTitle}>{t('onb_import_title', lang)}</Text>
+      <View style={s.bodyCard}>
+        <Text style={s.bodyText}>{t('onb_import_body', lang)}</Text>
+      </View>
+      {/* Demo card */}
+      <View style={s.demoCard}>
+        <View style={s.demoHeader}>
+          <Ionicons name="add-circle-outline" size={15} color={ED.copper} />
+          <Text style={s.demoHeaderText}>{t('onb_import_manual_title', lang)}</Text>
+        </View>
+        <View style={s.demoSearch}>
+          <Ionicons name="search-outline" size={13} color={ED.ink4} />
+          <Text style={s.demoSearchText}>The Witcher 3</Text>
+          <View style={s.cursor} />
+        </View>
+        <View style={s.demoSuggestion}>
+          <View style={s.demoGameIcon}>
+            <Ionicons name="game-controller-outline" size={13} color={ED.plum} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.demoGameTitle}>The Witcher 3: Wild Hunt</Text>
+            <Text style={s.demoGameMeta}>PC  ·  ~50h  ·  RPG</Text>
+          </View>
+          <Ionicons name="checkmark-circle" size={15} color={ED.moss} />
+        </View>
+        <Text style={s.demoDesc}>{t('onb_import_manual_desc', lang)}</Text>
+      </View>
+      <TouchableOpacity style={s.cta} onPress={goNext} activeOpacity={0.85}>
+        <Text style={s.ctaText}>{t('onb_import_cta', lang)}</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 
-  // ── Step 6: Tour invite ──────────────────────────────────────
   const renderTourStep = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.stepContainer}>
-        <View style={[styles.iconCircle, { backgroundColor: C.violet + '22', borderColor: C.violet + '44' }]}>
-          <Ionicons name="map-outline" size={48} color={C.violet} />
-        </View>
-
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          {t('onb_tour_title', lang)}
-        </Text>
-
-        <View style={[styles.bodyCard, { backgroundColor: C.card, borderColor: DARK.glassBorder }]}>
-          <Text style={[styles.bodyText, { color: C.textSecondary }]}>
-            {t('onb_tour_body', lang)}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: C.violet }]}
-          onPress={() => setShowTutorial(true)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="play-circle-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.ctaText}>{t('onb_tour_btn', lang)}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleComplete} style={styles.skipButton}>
-          <Text style={[styles.skipText, { color: C.textMuted }]}>
-            {t('onb_tour_skip', lang)}
-          </Text>
-        </TouchableOpacity>
+    <ScrollView contentContainerStyle={s.stepWrap} showsVerticalScrollIndicator={false}>
+      <View style={[s.iconRing, { backgroundColor: ED.plumBg, borderColor: ED.plum + '44' }]}>
+        <Ionicons name="map-outline" size={26} color={ED.plum} />
       </View>
+      <Text style={s.bigTitle}>{t('onb_tour_title', lang)}</Text>
+      <View style={s.bodyCard}>
+        <Text style={s.bodyText}>{t('onb_tour_body', lang)}</Text>
+      </View>
+      <TouchableOpacity
+        style={[s.cta, { backgroundColor: ED.plum, borderColor: ED.plum }]}
+        onPress={() => setShowTutorial(true)}
+        activeOpacity={0.85}
+      >
+        <Text style={s.ctaText}>{t('onb_tour_btn', lang)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={handleComplete} style={s.skipBtn}>
+        <Text style={s.skipText}>{t('onb_tour_skip', lang)}</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 
-  // ── Render ───────────────────────────────────────────────────
   const renderStep = () => {
-    switch (currentStep) {
+    switch (step) {
       case 0: return renderLanguageStep();
       case 1: return renderWelcomeStep();
       case 2: return renderFeaturesStep();
@@ -526,263 +265,142 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   return (
     <>
-      <LinearGradient
-        colors={[DARK.bg, '#0d0d20', DARK.bg]}
-        style={styles.root}
-      >
-        {/* Ambient glow top */}
-        <View
-          style={[
-            styles.ambientGlow,
-            { backgroundColor: C.accent + '18' },
-          ]}
-          pointerEvents="none"
-        />
-
-        {/* Step dots */}
+      <View style={s.root}>
+        {/* Top accent rule */}
+        <View style={s.topRule} />
         {renderDots()}
-
-        {/* Animated step content */}
-        <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim }]}>
+        <Animated.View style={[{ flex: 1 }, { opacity: fadeAnim }]}>
           {renderStep()}
         </Animated.View>
-      </LinearGradient>
+      </View>
 
       <TutorialOverlay
         visible={showTutorial}
-        lang={selectedLanguage}
-        onClose={() => {
-          setShowTutorial(false);
-          handleComplete();
-        }}
+        lang={lang}
+        onClose={() => { setShowTutorial(false); handleComplete(); }}
       />
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: ED.bg },
+
+  topRule: {
+    height: 1,
+    backgroundColor: ED.copperLine,
+    marginBottom: 0,
   },
-  ambientGlow: {
-    position: 'absolute',
-    top: -80,
-    left: SCREEN_WIDTH * 0.1,
-    width: SCREEN_WIDTH * 0.8,
-    height: 260,
-    borderRadius: 130,
-    opacity: 0.6,
-  },
+
   dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6,
-    paddingTop: 56,
+    paddingTop: Platform.OS === 'ios' ? 54 : 40,
     paddingBottom: 4,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: ED.ink4,
   },
-  animatedWrapper: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  stepContainer: {
+  dotActive: { width: 20, backgroundColor: ED.copper },
+
+  stepWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    gap: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 28,
+    gap: 18,
   },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  iconRing: {
+    width: 68, height: 68, borderRadius: 34,
+    backgroundColor: ED.copperBg, borderWidth: 1, borderColor: ED.copperLine,
+    alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-    lineHeight: 32,
+
+  bigTitle: {
+    fontSize: 30, fontWeight: '800', letterSpacing: -1.2, lineHeight: 34,
+    color: ED.ink, textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginTop: -8,
+  sub: {
+    fontSize: 14, color: ED.ink3, textAlign: 'center', lineHeight: 20, marginTop: -6,
   },
-  langRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 8,
-  },
+
+  langRow: { flexDirection: 'row', gap: 12, alignSelf: 'stretch' },
   langCard: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 24,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: 8,
+    flex: 1, alignItems: 'center', paddingVertical: 20,
+    borderRadius: 14, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface1, gap: 8,
   },
-  langFlag: {
-    fontSize: 40,
+  langCardActive: { borderColor: ED.copperLine, backgroundColor: ED.copperBg },
+  langLabel: { fontSize: 14, fontWeight: '600', color: ED.ink2 },
+
+  cta: {
+    alignSelf: 'stretch', height: 52, borderRadius: 14,
+    backgroundColor: ED.copper,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 4,
   },
-  langLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  langCheck: {
-    marginTop: 2,
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 14,
-    marginTop: 8,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  ctaText: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  skipButton: {
-    paddingVertical: 8,
-  },
-  skipText: {
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
+  ctaText: { fontSize: 16, fontWeight: '700', color: '#1A1108' },
+  skipBtn: { paddingVertical: 8, marginTop: -4 },
+  skipText: { fontSize: 13, color: ED.ink3, textDecorationLine: 'underline' },
+
   bodyCard: {
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 20,
+    alignSelf: 'stretch',
+    borderRadius: 14, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface1, padding: 18,
   },
-  bodyText: {
-    fontSize: 15,
-    lineHeight: 24,
+  bodyText: { fontSize: 14, color: ED.ink2, lineHeight: 22 },
+
+  featGrid: { alignSelf: 'stretch', gap: 10 },
+  featCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
+    borderRadius: 12, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface1, padding: 14,
   },
-  featuresGrid: {
-    width: '100%',
-    gap: 12,
+  featIcon: {
+    width: 38, height: 38, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  featureCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  featureIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  featureDesc: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  featTitle: { fontSize: 13, fontWeight: '700', color: ED.ink, marginBottom: 3 },
+  featDesc: { fontSize: 12, color: ED.ink3, lineHeight: 18 },
+
   nameInput: {
-    width: '100%',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    fontSize: 17,
-    fontWeight: '500',
+    alignSelf: 'stretch', height: 52,
+    borderRadius: 14, borderWidth: 1.5, borderColor: ED.copperLine,
+    backgroundColor: ED.surface1,
+    paddingHorizontal: 18, fontSize: 16, fontWeight: '500', color: ED.ink,
   },
+
   demoCard: {
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
+    alignSelf: 'stretch',
+    borderRadius: 14, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface1, padding: 16, gap: 10,
   },
   demoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: ED.line,
   },
-  demoHeaderText: {
-    fontSize: 15,
-    fontWeight: '700',
+  demoHeaderText: { fontSize: 13, fontWeight: '700', color: ED.ink },
+  demoSearch: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    borderRadius: 8, borderWidth: 1, borderColor: ED.copperLine,
+    backgroundColor: ED.copperBg, paddingHorizontal: 10, paddingVertical: 9,
   },
-  demoSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  demoSearchText: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-  },
-  demoCursor: {
-    width: 2,
-    height: 18,
-    borderRadius: 1,
-    opacity: 0.8,
-  },
+  demoSearchText: { flex: 1, fontSize: 13, fontWeight: '500', color: ED.copper },
+  cursor: { width: 2, height: 14, borderRadius: 1, backgroundColor: ED.copper, opacity: 0.8 },
   demoSuggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 8, borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2, padding: 10,
   },
   demoGameIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: ED.plumBg, alignItems: 'center', justifyContent: 'center',
   },
-  demoGameTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  demoGameMeta: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  demoDesc: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  demoGameTitle: { fontSize: 12, fontWeight: '600', color: ED.ink },
+  demoGameMeta: { fontSize: 11, color: ED.ink3, marginTop: 1 },
+  demoDesc: { fontSize: 12, color: ED.ink3, lineHeight: 18 },
 });

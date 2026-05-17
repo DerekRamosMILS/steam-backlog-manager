@@ -1,47 +1,29 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  StatusBar,
-  LayoutAnimation,
-  Platform,
-  UIManager,
+  View, Text, FlatList, ScrollView, StyleSheet, TextInput,
+  TouchableOpacity, StatusBar, Platform, UIManager,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { useGames } from '../../src/hooks/useGames';
-import { GameCard } from '../../src/components/GameCard';
-import { useAppContext } from '../../src/hooks/useAppContext';
-import { Game, GameStatus, Platform as GamePlatform } from '../../src/types';
-import { priorityWeight } from '../../src/utils/formatters';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useGames } from '../hooks/useGames';
+import { useAppContext } from '../hooks/useAppContext';
+import { GameCover } from '../components/GameCover';
 import { ManualGameModal } from '../components/ManualGameModal';
-import { t, Language } from '../../src/i18n';
+import { Game, GameStatus, Platform as GamePlatform } from '../types';
+import { priorityWeight } from '../utils/formatters';
+import { ED, edStyles, STATUS_COLORS, PRIORITY_COLORS, MONO_FONT } from '../styles/editorial';
+import { t, Language } from '../i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 type PlatformMode = 'all' | GamePlatform;
-
-type SortMode =
-  | 'priority_high'
-  | 'priority_low'
-  | 'hltb_met'
-  | 'shortest'
-  | 'longest'
-  | 'recently_played'
-  | 'least_recently_played'
-  | 'alphabetical_asc'
-  | 'alphabetical_desc';
+type SortMode = 'priority_high' | 'priority_low' | 'hltb_met' | 'shortest' | 'longest' | 'recently_played' | 'least_recently_played' | 'alphabetical_asc' | 'alphabetical_desc';
 type ShortMode = 'all' | 'under_5' | 'under_10';
+type ViewMode = 'grid' | 'list';
 
-function getFilterTabs(lang: Language): { key: GameStatus | 'all'; label: string }[] {
+function getFilterTabs(lang: Language): { key: GameStatus | 'all'; label: string; count?: number }[] {
   return [
     { key: 'all', label: t('lib_tab_all', lang) },
     { key: 'playing', label: t('lib_tab_playing', lang) },
@@ -53,408 +35,347 @@ function getFilterTabs(lang: Language): { key: GameStatus | 'all'; label: string
   ];
 }
 
-function getSortOptions(lang: Language): { key: SortMode; label: string }[] {
-  return [
-    { key: 'priority_high', label: t('sort_priority_high', lang) },
-    { key: 'priority_low', label: t('sort_priority_low', lang) },
-    { key: 'hltb_met', label: t('sort_hltb', lang) },
-    { key: 'shortest', label: t('sort_shortest', lang) },
-    { key: 'longest', label: t('sort_longest', lang) },
-    { key: 'recently_played', label: t('sort_recent', lang) },
-    { key: 'least_recently_played', label: t('sort_oldest', lang) },
-    { key: 'alphabetical_asc', label: t('sort_az', lang) },
-    { key: 'alphabetical_desc', label: t('sort_za', lang) },
-  ];
-}
-
-function getShortOptions(lang: Language): { key: ShortMode; label: string }[] {
-  return [
-    { key: 'all', label: t('lib_short_all', lang) },
-    { key: 'under_5', label: t('lib_short_5', lang) },
-    { key: 'under_10', label: t('lib_short_10', lang) },
-  ];
-}
-
-function getPlatformOptions(lang: Language): { key: PlatformMode; label: string }[] {
-  return [
-    { key: 'all', label: t('lib_all', lang) },
-    { key: 'steam', label: 'Steam' },
-    { key: 'gog', label: 'GOG' },
-    { key: 'epic', label: 'Epic' },
-    { key: 'playstation', label: 'PlayStation' },
-    { key: 'xbox', label: 'Xbox' },
-    { key: 'nintendo', label: 'Nintendo' },
-    { key: 'other', label: 'Other' },
-  ];
+function compareGames(a: Game, b: Game, mode: SortMode): number {
+  switch (mode) {
+    case 'priority_high': return priorityWeight(b.priority) - priorityWeight(a.priority) || a.title.localeCompare(b.title);
+    case 'priority_low': return priorityWeight(a.priority) - priorityWeight(b.priority) || a.title.localeCompare(b.title);
+    case 'shortest': return (a.hltb_main_story ?? Infinity) - (b.hltb_main_story ?? Infinity);
+    case 'longest': return (b.hltb_main_story ?? 0) - (a.hltb_main_story ?? 0);
+    case 'recently_played': {
+      const da = a.last_played ? new Date(a.last_played).getTime() : 0;
+      const db = b.last_played ? new Date(b.last_played).getTime() : 0;
+      return db - da;
+    }
+    case 'alphabetical_asc': return a.title.localeCompare(b.title);
+    case 'alphabetical_desc': return b.title.localeCompare(a.title);
+    default: return 0;
+  }
 }
 
 export default function LibraryScreen() {
-  const { themeColors, language } = useAppContext();
-  const { games, refresh, search, setStatus } = useGames();
+  const router = useRouter();
+  const { language } = useAppContext();
+  const { games, stats, refresh, search, setStatus } = useGames();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<GameStatus | 'all'>('all');
-  const [platformMode, setPlatformMode] = useState<PlatformMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('priority_high');
-  const [shortMode, setShortMode] = useState<ShortMode>('all');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [showSort, setShowSort] = useState(false);
 
   const FILTER_TABS = getFilterTabs(language);
-  const SORT_OPTIONS = getSortOptions(language);
-  const SHORT_OPTIONS = getShortOptions(language);
-  const PLATFORM_OPTIONS = getPlatformOptions(language);
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh])
-  );
-
-  const toggleFilters = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setFiltersOpen((v) => !v);
-  };
-
-  const clearFilters = () => {
-    setPlatformMode('all');
-    setSortMode('priority_high');
-    setShortMode('all');
-  };
-
-  const hasActiveFilters = platformMode !== 'all' || sortMode !== 'priority_high' || shortMode !== 'all';
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const filtered: Game[] = (() => {
     let list = query.trim() ? search(query) : games;
-    if (filter !== 'all') list = list.filter((g) => g.status === filter);
-    if (platformMode !== 'all') list = list.filter((g) => g.platform === platformMode);
-    if (shortMode !== 'all') {
-      const maxSeconds = shortMode === 'under_5' ? 5 * 3600 : 10 * 3600;
-      list = list.filter((g) => g.hltb_main_story !== null && g.hltb_main_story <= maxSeconds);
-    }
+    if (filter !== 'all') list = list.filter(g => g.status === filter);
     return [...list].sort((a, b) => compareGames(a, b, sortMode));
   })();
 
-  const activeChips: string[] = [];
-  if (platformMode !== 'all') activeChips.push(platformMode.toUpperCase());
-  if (sortMode !== 'priority_high') activeChips.push(SORT_OPTIONS.find((s) => s.key === sortMode)?.label ?? sortMode);
-  if (shortMode !== 'all') activeChips.push(SHORT_OPTIONS.find((s) => s.key === shortMode)?.label ?? shortMode);
+  const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+    { key: 'priority_high', label: language === 'es' ? 'Prioridad ↑' : 'Priority ↑' },
+    { key: 'shortest', label: language === 'es' ? 'Más cortos' : 'Shortest' },
+    { key: 'longest', label: language === 'es' ? 'Más largos' : 'Longest' },
+    { key: 'recently_played', label: language === 'es' ? 'Recientes' : 'Recent' },
+    { key: 'alphabetical_asc', label: 'A–Z' },
+  ];
+
+  const renderGridItem = ({ item, index }: { item: Game; index: number }) => {
+    const sc = STATUS_COLORS[item.status];
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => router.push(`/game/${item.id}`)}
+        activeOpacity={0.85}
+      >
+        <View style={{ position: 'relative' }}>
+          <GameCover uri={item.cover_url} width="100%" height={150} radius={8} />
+          {item.status === 'playing' && (
+            <View style={styles.playingBadge}>
+              <View style={[styles.playingDot, { backgroundColor: ED.moss }]} />
+              <Text style={styles.playingBadgeText}>PLAYING</Text>
+            </View>
+          )}
+          {item.status === 'completed' && (
+            <View style={styles.completedBadge}>
+              <Ionicons name="checkmark" size={10} color={ED.plum} />
+            </View>
+          )}
+          {item.priority === 'high' && item.status !== 'completed' && (
+            <View style={styles.priorityBadge}>
+              <Text style={styles.priorityBadgeText}>↑ HIGH</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ marginTop: 8 }}>
+          <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
+          <View style={styles.gridMeta}>
+            {item.hltb_main_story !== null && (
+              <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>
+                {item.hltb_main_story}h
+              </Text>
+            )}
+            {item.progress_percentage > 0 && item.progress_percentage < 100 && (
+              <Text style={[edStyles.eyebrow, { color: ED.copper }]}>
+                {item.progress_percentage}%
+              </Text>
+            )}
+          </View>
+          {item.progress_percentage > 0 && item.progress_percentage < 100 && (
+            <View style={[edStyles.progressBar, { height: 2, marginTop: 4 }]}>
+              <View style={[edStyles.progressFill, { width: `${item.progress_percentage}%` as any }]} />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderListItem = ({ item }: { item: Game }) => {
+    const sc = STATUS_COLORS[item.status];
+    return (
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={() => router.push(`/game/${item.id}`)}
+        activeOpacity={0.85}
+      >
+        <GameCover uri={item.cover_url} width={48} height={64} radius={6} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.listTitle} numberOfLines={1}>{item.title}</Text>
+          <View style={styles.listMetaRow}>
+            <View style={[edStyles.chip, { paddingHorizontal: 7, paddingVertical: 3 }]}>
+              <Text style={[edStyles.chipText, { color: sc.color, fontSize: 10 }]}>{sc.label}</Text>
+            </View>
+            {item.hltb_main_story !== null && (
+              <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>
+                <Text style={{ fontFamily: MONO_FONT }}>{item.hltb_main_story}</Text>h
+              </Text>
+            )}
+            <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>{item.platform.toUpperCase()}</Text>
+          </View>
+          {item.progress_percentage > 0 && item.progress_percentage < 100 && (
+            <View style={[edStyles.progressBar, { marginTop: 6 }]}>
+              <View style={[edStyles.progressFill, { width: `${item.progress_percentage}%` as any }]} />
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={14} color={ED.ink4} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.root}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
 
-      {/* Fixed header */}
+      {/* ── Header ──────────────────────────────────────── */}
       <View style={styles.headerWrap}>
-        {/* Title row */}
         <View style={styles.titleRow}>
           <View>
-            <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('lib_title', language)}</Text>
-            <Text style={[styles.gameCount, { color: themeColors.textMuted }]}>
-              {filtered.length} {filtered.length === 1 ? t('lib_game', language) : t('lib_games', language)}
+            <Text style={[edStyles.eyebrow, { marginBottom: 4 }]}>
+              {filtered.length} {language === 'es' ? 'títulos' : 'titles'} · {stats ? `${stats.total_hours_remaining}h` : '—'} {language === 'es' ? 'para terminar' : 'to clear'}
             </Text>
+            <Text style={styles.title}>{t('lib_title', language)}</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: themeColors.accent }]}
-            onPress={() => setManualModalOpen(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.addBtnText}>{t('lib_add_game', language)}</Text>
-          </TouchableOpacity>
+          <View style={styles.titleActions}>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
+              onPress={() => setViewMode('list')}
+            >
+              <Ionicons name="list-outline" size={14} color={viewMode === 'list' ? ED.bg : ED.ink2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'grid' && styles.viewToggleBtnActive]}
+              onPress={() => setViewMode('grid')}
+            >
+              <Ionicons name="grid-outline" size={14} color={viewMode === 'grid' ? ED.bg : ED.ink2} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Search + Filter toggle row */}
+        {/* Search */}
         <View style={styles.searchRow}>
-          <View style={[styles.searchWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
-            <Ionicons name="search" size={16} color={themeColors.textMuted} />
+          <View style={styles.searchWrap}>
+            <Ionicons name="search-outline" size={15} color={ED.ink3} />
             <TextInput
-              style={[styles.searchInput, { color: themeColors.textPrimary }]}
-              placeholder={t('lib_search', language)}
-              placeholderTextColor={themeColors.textMuted}
+              style={styles.searchInput}
+              placeholder={language === 'es' ? 'Buscar títulos, géneros…' : 'Search titles, genres…'}
+              placeholderTextColor={ED.ink3}
               value={query}
               onChangeText={setQuery}
-              returnKeyType="search"
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')}>
-                <Ionicons name="close-circle" size={16} color={themeColors.textMuted} />
+                <Ionicons name="close-circle" size={15} color={ED.ink3} />
               </TouchableOpacity>
             )}
           </View>
           <TouchableOpacity
-            style={[
-              styles.filterToggleBtn,
-              {
-                borderColor: filtersOpen || hasActiveFilters ? themeColors.accent : themeColors.glassBorder,
-                backgroundColor: filtersOpen || hasActiveFilters ? themeColors.accent + '22' : themeColors.glass,
-              },
-            ]}
-            onPress={toggleFilters}
-            activeOpacity={0.8}
+            style={[styles.sortBtn, showSort && { backgroundColor: ED.copper, borderColor: ED.copper }]}
+            onPress={() => setShowSort(v => !v)}
           >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color={filtersOpen || hasActiveFilters ? themeColors.accent : themeColors.textMuted}
-            />
+            <Ionicons name="swap-vertical-outline" size={16} color={showSort ? '#1A1108' : ED.ink2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortBtn, { backgroundColor: ED.copper, borderColor: ED.copper }]}
+            onPress={() => setManualModalOpen(true)}
+          >
+            <Ionicons name="add" size={18} color="#1A1108" />
           </TouchableOpacity>
         </View>
 
-        {/* Collapsible filter panel */}
-        {filtersOpen && (
-          <View style={[styles.filterPanel, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
-            {/* Platform */}
-            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_platform', language)}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              <View style={styles.chipRow}>
-                {PLATFORM_OPTIONS.map((opt) => {
-                  const active = platformMode === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[styles.chip, { borderColor: active ? themeColors.accent : themeColors.glassBorder, backgroundColor: active ? themeColors.accent + '22' : 'transparent' }]}
-                      onPress={() => setPlatformMode(opt.key)}
-                    >
-                      <Text style={[styles.chipText, { color: active ? themeColors.accent : themeColors.textSecondary }]}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            {/* Sort */}
-            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_sort', language)}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              <View style={styles.chipRow}>
-                {SORT_OPTIONS.map((opt) => {
-                  const active = sortMode === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[styles.chip, { borderColor: active ? themeColors.violet : themeColors.glassBorder, backgroundColor: active ? themeColors.violet + '22' : 'transparent' }]}
-                      onPress={() => setSortMode(opt.key)}
-                    >
-                      <Text style={[styles.chipText, { color: active ? themeColors.violet : themeColors.textSecondary }]}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            {/* Duration */}
-            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_duration', language)}</Text>
-            <View style={styles.chipRow}>
-              {SHORT_OPTIONS.map((opt) => {
-                const active = shortMode === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    style={[styles.chip, { borderColor: active ? themeColors.teal : themeColors.glassBorder, backgroundColor: active ? themeColors.teal + '22' : 'transparent' }]}
-                    onPress={() => setShortMode(opt.key)}
-                  >
-                    <Text style={[styles.chipText, { color: active ? themeColors.teal : themeColors.textSecondary }]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* Active filter chips */}
-        {activeChips.length > 0 && (
-          <View style={styles.activeChipsRow}>
-            {activeChips.map((chip) => (
-              <View key={chip} style={[styles.activeChip, { borderColor: themeColors.accent + '55', backgroundColor: themeColors.accent + '14' }]}>
-                <Text style={[styles.activeChipText, { color: themeColors.accent }]}>{chip}</Text>
-              </View>
+        {/* Sort dropdown */}
+        {showSort && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortScroll}>
+            {SORT_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.sortChip, sortMode === opt.key && styles.sortChipActive]}
+                onPress={() => { setSortMode(opt.key); setShowSort(false); }}
+              >
+                <Text style={[styles.sortChipText, sortMode === opt.key && { color: ED.bg }]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
             ))}
-            <TouchableOpacity onPress={clearFilters} style={[styles.clearBtn, { borderColor: themeColors.glassBorder }]}>
-              <Text style={[styles.clearBtnText, { color: themeColors.textMuted }]}>{t('lib_clear', language)}</Text>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         )}
 
-        {/* Status tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabList}
-          style={styles.tabScroller}
-        >
-          {FILTER_TABS.map((tab) => {
+        {/* Status filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          {FILTER_TABS.map(tab => {
             const active = filter === tab.key;
+            const count = tab.key === 'all' ? games.length : games.filter(g => g.status === tab.key).length;
             return (
               <TouchableOpacity
                 key={tab.key}
-                style={[
-                  styles.tab,
-                  {
-                    backgroundColor: active ? themeColors.accent : themeColors.glass,
-                    borderColor: active ? themeColors.accent : themeColors.glassBorder,
-                  },
-                ]}
+                style={[styles.filterChip, active && styles.filterChipActive]}
                 onPress={() => setFilter(tab.key)}
-                activeOpacity={0.8}
               >
-                <Text style={[styles.tabText, { color: active ? '#fff' : themeColors.textSecondary }]}>
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
                   {tab.label}
+                </Text>
+                <Text style={[styles.filterCount, active && { color: ED.bg }]}>
+                  {count}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+
+        {/* Results header */}
+        <View style={[edStyles.sectionHead, { marginBottom: 8, paddingBottom: 0 }]}>
+          <Text style={edStyles.eyebrow}>
+            {filter === 'all' ? 'A–Z' : STATUS_COLORS[filter as GameStatus]?.label || filter} · {filtered.length} {language === 'es' ? 'resultados' : 'results'}
+          </Text>
+          <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>
+            {language === 'es' ? 'SORT' : 'SORT'} ▾ {SORT_OPTIONS.find(s => s.key === sortMode)?.label}
+          </Text>
+        </View>
       </View>
 
-      {/* Games list */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <GameCard game={item} onStatusChange={setStatus} />}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="game-controller-outline" size={48} color={themeColors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>{t('lib_empty_title', language)}</Text>
-            <Text style={[styles.emptySubtitle, { color: themeColors.textMuted }]}>
-              {query ? t('lib_empty_search', language) : t('lib_empty_add', language)}
-            </Text>
-          </View>
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      {/* ── Games list/grid ──────────────────────────── */}
+      {viewMode === 'grid' ? (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => String(item.id)}
+          numColumns={3}
+          renderItem={renderGridItem}
+          contentContainerStyle={styles.gridContent}
+          columnWrapperStyle={styles.gridRow}
+          ListEmptyComponent={<EmptyState query={query} language={language} />}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => String(item.id)}
+          renderItem={renderListItem}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={edStyles.divider} />}
+          ListEmptyComponent={<EmptyState query={query} language={language} />}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
       <ManualGameModal
         visible={manualModalOpen}
         onClose={() => setManualModalOpen(false)}
-        onGameAdded={() => { refresh(); }}
+        onGameAdded={() => refresh()}
       />
     </View>
   );
 }
 
-function compareGames(a: Game, b: Game, mode: SortMode): number {
-  switch (mode) {
-    case 'priority_high':
-      return priorityWeight(b.priority) - priorityWeight(a.priority) || a.title.localeCompare(b.title);
-    case 'priority_low':
-      return priorityWeight(a.priority) - priorityWeight(b.priority) || a.title.localeCompare(b.title);
-    case 'hltb_met': {
-      const aPlayedSec = (a.playtime_minutes ?? 0) * 60;
-      const bPlayedSec = (b.playtime_minutes ?? 0) * 60;
-      const aMet = a.hltb_main_story !== null && aPlayedSec >= a.hltb_main_story ? 1 : 0;
-      const bMet = b.hltb_main_story !== null && bPlayedSec >= b.hltb_main_story ? 1 : 0;
-      if (bMet !== aMet) return bMet - aMet;
-      if (aMet && bMet) return bPlayedSec - aPlayedSec;
-      return a.title.localeCompare(b.title);
-    }
-    case 'shortest':
-      return (a.hltb_main_story ?? Infinity) - (b.hltb_main_story ?? Infinity);
-    case 'longest':
-      return (b.hltb_main_story ?? 0) - (a.hltb_main_story ?? 0);
-    case 'recently_played': {
-      const da = a.last_played ? new Date(a.last_played).getTime() : 0;
-      const db2 = b.last_played ? new Date(b.last_played).getTime() : 0;
-      return db2 - da;
-    }
-    case 'least_recently_played': {
-      const da = a.last_played ? new Date(a.last_played).getTime() : Infinity;
-      const db2 = b.last_played ? new Date(b.last_played).getTime() : Infinity;
-      return da - db2;
-    }
-    case 'alphabetical_asc':
-      return a.title.localeCompare(b.title);
-    case 'alphabetical_desc':
-      return b.title.localeCompare(a.title);
-    default:
-      return 0;
-  }
+function EmptyState({ query, language }: { query: string; language: string }) {
+  return (
+    <View style={styles.empty}>
+      <Ionicons name="game-controller-outline" size={44} color={ED.ink4} />
+      <Text style={styles.emptyTitle}>{language === 'es' ? 'Sin juegos' : 'No games'}</Text>
+      <Text style={[edStyles.eyebrow, { color: ED.ink3, textAlign: 'center', marginTop: 4 }]}>
+        {query
+          ? language === 'es' ? 'Sin resultados para esa búsqueda' : 'No results for that search'
+          : language === 'es' ? 'Importa juegos o agrega uno manualmente' : 'Import games or add one manually'
+        }
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  headerWrap: {
-    paddingTop: 56,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    zIndex: 10,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  title: { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
-  gameCount: { fontSize: 12, marginTop: 2 },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  root: { flex: 1, backgroundColor: ED.bg },
+  headerWrap: { paddingTop: 56, paddingHorizontal: 16, paddingBottom: 8, backgroundColor: ED.bg },
+
+  // Header
+  titleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 },
+  title: { fontSize: 36, fontWeight: '800', letterSpacing: -1.5, color: ED.ink },
+  titleActions: { flexDirection: 'row', gap: 4, paddingBottom: 4 },
+  viewToggleBtn: { width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: ED.surface2, borderWidth: 1, borderColor: ED.line },
+  viewToggleBtnActive: { backgroundColor: ED.ink, borderColor: ED.ink },
+
+  // Search
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  searchWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 42,
-  },
-  searchInput: { flex: 1, fontSize: 14 },
-  filterToggleBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterPanel: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 10,
-    gap: 4,
-  },
-  filterSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    marginTop: 6,
-  },
-  chipScroll: { marginBottom: 4 },
-  chipRow: { flexDirection: 'row', gap: 6, flexWrap: 'nowrap' },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 12, fontWeight: '600' },
-  activeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  activeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  activeChipText: { fontSize: 11, fontWeight: '700' },
-  clearBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  clearBtnText: { fontSize: 11, fontWeight: '600' },
-  tabScroller: { marginBottom: 4 },
-  tabList: { gap: 6, paddingVertical: 4 },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  tabText: { fontSize: 12, fontWeight: '700' },
-  listContent: { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 8 },
-  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptySubtitle: { fontSize: 13, textAlign: 'center', maxWidth: 260, lineHeight: 18 },
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, height: 42, borderRadius: 12, backgroundColor: ED.surface1, borderWidth: 1, borderColor: ED.line },
+  searchInput: { flex: 1, color: ED.ink, fontSize: 14, fontWeight: '400' },
+  sortBtn: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: ED.surface2, borderWidth: 1, borderColor: ED.line },
+
+  // Sort
+  sortScroll: { marginBottom: 10 },
+  sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: ED.surface2, borderWidth: 1, borderColor: ED.line, marginRight: 6 },
+  sortChipActive: { backgroundColor: ED.ink, borderColor: ED.ink },
+  sortChipText: { fontSize: 12, fontWeight: '600', color: ED.ink2 },
+
+  // Filter chips
+  filterScroll: { marginBottom: 12 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 12, borderRadius: 100, backgroundColor: ED.surface2, borderWidth: 1, borderColor: ED.line, marginRight: 6 },
+  filterChipActive: { backgroundColor: ED.ink, borderColor: ED.ink },
+  filterChipText: { fontSize: 11, fontWeight: '500', color: ED.ink2 },
+  filterChipTextActive: { color: ED.bg },
+  filterCount: { fontFamily: MONO_FONT, fontSize: 10, color: ED.ink3, opacity: 0.7 },
+
+  // Grid
+  gridContent: { paddingHorizontal: 16, paddingBottom: 120 },
+  gridRow: { gap: 10, marginBottom: 18 },
+  gridItem: { flex: 1 },
+  gridTitle: { fontSize: 12, fontWeight: '600', letterSpacing: -0.2, color: ED.ink, lineHeight: 16 },
+  gridMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 },
+
+  // Grid badges
+  playingBadge: { position: 'absolute', top: 5, left: 5, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4 },
+  playingDot: { width: 5, height: 5, borderRadius: 3 },
+  playingBadgeText: { fontFamily: MONO_FONT, fontSize: 8, fontWeight: '600', color: ED.moss, letterSpacing: 0.4 },
+  completedBadge: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: ED.plumBg, alignItems: 'center', justifyContent: 'center' },
+  priorityBadge: { position: 'absolute', top: 5, right: 5, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4 },
+  priorityBadgeText: { fontFamily: MONO_FONT, fontSize: 8, fontWeight: '600', color: ED.rust, letterSpacing: 0.4 },
+
+  // List
+  listContent: { paddingHorizontal: 16, paddingBottom: 120 },
+  listItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, backgroundColor: ED.bg },
+  listTitle: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2, color: ED.ink, marginBottom: 5 },
+  listMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+
+  // Empty
+  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: ED.ink },
 });

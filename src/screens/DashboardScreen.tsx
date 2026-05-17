@@ -1,52 +1,37 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  RefreshControl,
-  StatusBar,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  RefreshControl, StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { useGames } from '../../src/hooks/useGames';
-import { useRecommendation } from '../../src/hooks/useRecommendation';
-import { GameCard } from '../../src/components/GameCard';
-import { GameCover } from '../../src/components/GameCover';
-import { StatCard } from '../../src/components/StatCard';
-import { SectionHeader } from '../../src/components/SectionHeader';
-import { PickNextGameModal } from '../../src/components/PickNextGameModal';
-import { GlassCard } from '../../src/components/GlassCard';
-import { formatBacklogHours } from '../../src/utils/formatters';
-import { useAppContext } from '../../src/hooks/useAppContext';
-import { getDailyPick, getRecommendations, getRecentCompletionCelebration } from '../../src/services/recommendationService';
-import { useRouter } from 'expo-router';
-import { CompletionCelebration, DailyPick, Game, Recommendation } from '../../src/types';
-import { t } from '../../src/i18n';
-import { SessionTimerModal } from '../../src/components/SessionTimerModal';
-
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useGames } from '../hooks/useGames';
+import { useRecommendation } from '../hooks/useRecommendation';
+import { useAppContext } from '../hooks/useAppContext';
+import { getDailyPick, getRecommendations } from '../services/recommendationService';
+import { GameCover } from '../components/GameCover';
+import { PickNextGameModal } from '../components/PickNextGameModal';
+import { SessionTimerModal } from '../components/SessionTimerModal';
+import { ED, edStyles, STATUS_COLORS, MONO_FONT } from '../styles/editorial';
+import { t } from '../i18n';
+import { Game, Recommendation, DailyPick } from '../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { games, stats, refresh, setStatus, getByStatus } = useGames();
   const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
-  const { themeColors, language, playerName } = useAppContext();
+  const { language, playerName } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [timerGame, setTimerGame] = useState<Game | null>(null);
   const [topRecs, setTopRecs] = useState<Recommendation[]>([]);
   const [dailyPick, setDailyPick] = useState<DailyPick | null>(null);
-  const [celebration, setCelebration] = useState<CompletionCelebration | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       refresh();
       refreshRec();
       setDailyPick(getDailyPick());
-      setCelebration(getRecentCompletionCelebration());
       setTopRecs(getRecommendations({ limit: 3 }));
     }, [refresh, refreshRec])
   );
@@ -58,276 +43,302 @@ export default function DashboardScreen() {
   };
 
   const playing = getByStatus('playing');
-  const upNext = getByStatus('up_next');
+  const upNext = getByStatus('up_next').slice(0, 3);
   const paused = getByStatus('paused');
+  const hero = playing[0] || null;
+
+  const today = new Date();
+  const dayName = today.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long' });
+  const monthDay = today.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { month: 'long', day: 'numeric' });
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.root}>
       <StatusBar barStyle="light-content" />
-
-      {/* Hero gradient background */}
-      <LinearGradient
-        colors={[themeColors.bg, themeColors.card]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.3, y: 0 }}
-        end={{ x: 0.7, y: 0.5 }}
-      />
-
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={themeColors.accent}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ED.copper} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* ── Header ─────────────────────────────────────────── */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.greeting, { color: themeColors.textPrimary }]}>
-              {t('dash_greeting', language)} {playerName || t('dash_greeting_default', language)}
+            <Text style={[edStyles.eyebrow, styles.dateLabel]}>
+              {dayName} · {monthDay}
             </Text>
-            <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
-              {stats
-                ? `${stats.total} ${t('dash_subtitle_games', language)} · ${formatBacklogHours(stats.total_hours_remaining)} ${t('dash_subtitle_remaining', language)}`
-                : t('dash_loading', language)}
+            <Text style={styles.greeting}>
+              {t('dash_greeting', language)} {playerName || 'Player'}.
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-              style={styles.pickBtn}
-              onPress={() => router.push('/share' as any)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[themeColors.teal, themeColors.blue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Ionicons name="share-social" size={18} color="#fff" />
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/share' as any)}>
+              <Ionicons name="share-outline" size={16} color={ED.ink2} />
             </TouchableOpacity>
-
             <TouchableOpacity
-              style={styles.pickBtn}
+              style={[styles.iconBtn, { backgroundColor: ED.copper, borderColor: ED.copper }]}
               onPress={() => setModalVisible(true)}
-              activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={[themeColors.accent, themeColors.violet]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Ionicons name="dice" size={18} color="#fff" />
+              <Ionicons name="dice-outline" size={16} color="#1A1108" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Backlog countdown banner */}
-        {stats && stats.total_hours_remaining > 0 && (
-          <View style={[styles.banner, { borderColor: themeColors.glassBorder }]}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={[themeColors.accent + '22', themeColors.orange + '10']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Ionicons name="hourglass-outline" size={20} color={themeColors.orange} />
-            <Text style={[styles.bannerText, { color: themeColors.textSecondary }]}>
-              {t('dash_backlog_banner', language)}{' '}
-              <Text style={{ color: themeColors.orange, fontWeight: '800' }}>
-                {formatBacklogHours(stats.total_hours_remaining)}
-              </Text>{' '}
-              {t('dash_backlog_banner2', language)}
+        {/* ── Currently Playing Hero ──────────────────────────── */}
+        {hero ? (
+          <View style={styles.section}>
+            <View style={edStyles.sectionHead}>
+              <View style={styles.nowPlayingLabel}>
+                <View style={[styles.dot, { backgroundColor: ED.moss }]} />
+                <Text style={edStyles.eyebrow}>{language === 'es' ? 'Jugando ahora' : 'Now Playing'}</Text>
+              </View>
+              <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>
+                01 / {playing.length.toString().padStart(2, '0')}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={edStyles.card}
+              onPress={() => router.push(`/game/${hero.id}`)}
+              activeOpacity={0.9}
+            >
+              {/* Cover banner */}
+              <GameCover uri={hero.cover_url} width="100%" height={168} radius={0} style={{ borderTopLeftRadius: ED.radius, borderTopRightRadius: ED.radius }} />
+
+              {/* Title block */}
+              <View style={styles.heroBody}>
+                <View style={styles.heroTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.heroTitle} numberOfLines={1}>{hero.title}</Text>
+                    <View style={styles.heroMeta}>
+                      <View style={edStyles.pill}>
+                        <Text style={edStyles.pillText}>{hero.platform.toUpperCase()}</Text>
+                      </View>
+                      {hero.genre_names && (
+                        <Text style={[styles.metaText, { color: ED.ink3 }]}>
+                          · {hero.genre_names.split(',')[0]}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.heroPercent}>
+                    {hero.progress_percentage}
+                    <Text style={{ fontSize: 14, color: ED.ink3 }}>%</Text>
+                  </Text>
+                </View>
+
+                <View style={[edStyles.progressBar, { marginTop: 14 }]}>
+                  <View style={[edStyles.progressFill, { width: `${hero.progress_percentage}%` as any }]} />
+                </View>
+
+                <View style={styles.heroStats}>
+                  <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>
+                    <Text style={{ fontFamily: MONO_FONT, color: ED.ink2 }}>
+                      {Math.round(hero.playtime_minutes / 60)}h
+                    </Text>
+                    {' '}{language === 'es' ? 'jugadas' : 'played'}
+                    {hero.hltb_main_story ? ` · ${Math.round(Math.max(0, hero.hltb_main_story - hero.playtime_minutes / 60))}h ${language === 'es' ? 'restantes' : 'left'}` : ''}
+                  </Text>
+                  {hero.hltb_main_story && (
+                    <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>
+                      HLTB <Text style={{ fontFamily: MONO_FONT, color: ED.ink3 }}>{hero.hltb_main_story}h</Text>
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Session CTA */}
+              <View style={styles.heroCta}>
+                <TouchableOpacity
+                  style={[edStyles.btn, edStyles.btnPrimary, { flex: 1, height: 50 }]}
+                  onPress={() => setTimerGame(hero)}
+                >
+                  <Ionicons name="play" size={16} color="#1A1108" />
+                  <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>
+                    {language === 'es' ? 'Empezar sesión' : 'Start session'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[edStyles.btn, { width: 50, height: 50 }]}>
+                  <Ionicons name="bookmark-outline" size={18} color={ED.ink2} />
+                </TouchableOpacity>
+              </View>
+              {hero.last_played && (
+                <View style={styles.lastPlayed}>
+                  <Text style={[edStyles.eyebrow, { color: ED.ink3, flex: 1 }]}>
+                    {language === 'es' ? 'Última sesión' : 'Last session'} ·{' '}
+                    {new Date(hero.last_played).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Second playing — compact */}
+            {playing[1] && (
+              <TouchableOpacity
+                style={[edStyles.card, styles.compactCard]}
+                onPress={() => router.push(`/game/${playing[1].id}`)}
+              >
+                <GameCover uri={playing[1].cover_url} width={48} height={64} radius={6} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.compactTitle} numberOfLines={1}>{playing[1].title}</Text>
+                  <Text style={[edStyles.eyebrow, { color: ED.ink3, marginTop: 4 }]}>
+                    <Text style={{ fontFamily: MONO_FONT }}>{playing[1].progress_percentage}%</Text>
+                    {' '}· {language === 'es' ? 'último hace 5 días' : 'last played 5d ago'}
+                  </Text>
+                  <View style={[edStyles.progressBar, { marginTop: 6 }]}>
+                    <View style={[edStyles.progressFill, { width: `${playing[1].progress_percentage}%` as any }]} />
+                  </View>
+                </View>
+                <Ionicons name="play-outline" size={18} color={ED.copper} />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          /* Empty state */
+          <View style={[edStyles.card, styles.emptyHero]}>
+            <Ionicons name="game-controller-outline" size={36} color={ED.ink4} />
+            <Text style={[styles.emptyTitle, { color: ED.ink2 }]}>
+              {language === 'es' ? 'Sin juegos activos' : 'No active games'}
+            </Text>
+            <Text style={[edStyles.eyebrow, { color: ED.ink3, textAlign: 'center', marginTop: 4 }]}>
+              {language === 'es' ? 'Mueve un juego a "Jugando" para empezar' : 'Move a game to "Playing" to get started'}
             </Text>
           </View>
         )}
 
-        {/* --- Premium Widget Top Row --- */}
+        {/* ── Backlog Snapshot ────────────────────────────────── */}
+        {stats && (
+          <View style={styles.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>{language === 'es' ? 'El Backlog' : 'The Backlog'}</Text>
+              <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>SNAPSHOT</Text>
+            </View>
+            <View style={styles.snapshotGrid}>
+              {[
+                { k: language === 'es' ? 'Total' : 'Total', v: stats.total.toString(), d: language === 'es' ? 'juegos' : 'games' },
+                { k: language === 'es' ? 'Horas restantes' : 'Hours left', v: stats.total_hours_remaining > 999 ? `${(stats.total_hours_remaining / 1000).toFixed(1)}k` : stats.total_hours_remaining.toString(), d: language === 'es' ? 'estimadas' : 'estimated' },
+                { k: language === 'es' ? 'Completados' : 'Completed', v: stats.completed.toString(), d: `${Math.round((stats.completed / Math.max(1, stats.total)) * 100)}%` },
+                { k: language === 'es' ? 'En progreso' : 'In flight', v: (stats.playing + stats.paused).toString(), d: language === 'es' ? 'activos + pausados' : 'active + paused' },
+              ].map((s, i) => (
+                <View key={i} style={styles.snapshotCell}>
+                  <Text style={[edStyles.eyebrow, { marginBottom: 8 }]}>{s.k}</Text>
+                  <Text style={styles.snapshotNum}>{s.v}</Text>
+                  <Text style={styles.snapshotSub}>{s.d}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── Daily Pick ──────────────────────────────────────── */}
         {dailyPick && (
           <View style={styles.section}>
-            <SectionHeader title={t('dash_daily_pick', language)} icon="flash" iconColor={themeColors.teal} />
-            <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
-              <GlassCard padding={16} radius={18} borderColor={themeColors.teal} intensity={26} style={{ overflow: 'hidden' }}>
-                <LinearGradient
-                  colors={[themeColors.teal + '22', themeColors.blue + '12']}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                  <GameCover uri={dailyPick.recommendation.game.cover_url} width={92} height={58} radius={12} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.recTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                      {dailyPick.recommendation.game.title}
-                    </Text>
-                    <Text style={[styles.recReason, { color: themeColors.textSecondary }]} numberOfLines={2}>
-                      {dailyPick.recommendation.reason}
-                    </Text>
-                    <Text style={[styles.dailyMeta, { color: themeColors.teal }]}>
-                      {dailyPick.subtitle}
-                    </Text>
-                  </View>
+            <View style={edStyles.sectionHead}>
+              <Text style={[edStyles.eyebrow, { color: ED.copper }]}>◆ {language === 'es' ? 'Pick del día' : 'Daily Pick'}</Text>
+              <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>
+                AI · {dailyPick.recommendation.match}% MATCH
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[edStyles.card, styles.pickCard]}
+              onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)}
+              activeOpacity={0.88}
+            >
+              <GameCover uri={dailyPick.recommendation.game.cover_url} width={80} height={110} radius={8} />
+              <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={styles.pickTitle} numberOfLines={2}>{dailyPick.recommendation.game.title}</Text>
+                  <Text style={styles.pickReason} numberOfLines={2}>{dailyPick.recommendation.reason}</Text>
                 </View>
-              </GlassCard>
+                <View style={styles.pickChips}>
+                  {dailyPick.recommendation.badges.slice(0, 2).map(b => (
+                    <View key={b} style={edStyles.chip}>
+                      <Text style={edStyles.chipText}>{b}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
             </TouchableOpacity>
           </View>
         )}
 
-        {celebration && (
-          <View style={styles.section}>
-            <SectionHeader title={t('dash_recent_win', language)} icon="trophy" iconColor={themeColors.orange} />
-            <GlassCard padding={18} radius={18} style={{ overflow: 'hidden' }}>
-              <LinearGradient
-                colors={[themeColors.orange + '20', themeColors.accent + '12']}
-                style={StyleSheet.absoluteFill}
-              />
-              <Text style={[styles.celebrationTitle, { color: themeColors.textPrimary }]}>
-                {celebration.title} completed
-              </Text>
-              <Text style={[styles.celebrationText, { color: themeColors.textSecondary }]}>
-                {t('dash_shaved', language)} {celebration.savedHours}h {t('dash_off_backlog', language)} {celebration.completedCount} {t('dash_completed_games', language)}
-              </Text>
-            </GlassCard>
-          </View>
-        )}
-
-        {topRecs.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader title={t('dash_ai_next', language)} icon="sparkles" iconColor={themeColors.orange} />
-            <TouchableOpacity onPress={() => router.push(`/game/${topRecs[0].game.id}`)} activeOpacity={0.8} style={{ position: 'relative', marginTop: 12 }}>
-              <View style={[styles.premiumBadgeRow, { backgroundColor: themeColors.accent, zIndex: 10 }]}>
-                <Text style={styles.premiumBadgeText}>Match {topRecs[0].match}%</Text>
-              </View>
-              <GlassCard padding={16} radius={16} borderColor={themeColors.accent} intensity={30}>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <GameCover uri={topRecs[0].game.cover_url} width={80} height={110} radius={12} />
-                  <View style={{ flex: 1, justifyContent: 'center' }}>
-                    <Text style={[styles.recTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-                      {topRecs[0].game.title}
-                    </Text>
-                    <Text style={[styles.recReason, { color: themeColors.textSecondary }]}>
-                      {topRecs[0].reason}
-                    </Text>
-                  </View>
-                </View>
-              </GlassCard>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Stats grid */}
-        {stats && (
-          <View style={styles.statsGrid}>
-            <View style={styles.statsRow}>
-              <StatCard
-                label={t('stat_total', language)}
-                value={stats.total}
-                icon="library"
-                color={themeColors.accent}
-              />
-              <StatCard
-                label={t('stat_playing', language)}
-                value={stats.playing}
-                icon="play-circle"
-                color={themeColors.green}
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <StatCard
-                label={t('stat_up_next', language)}
-                value={stats.up_next}
-                icon="bookmark"
-                color={themeColors.blue}
-              />
-              <StatCard
-                label={t('stat_hltb_met', language)}
-                value={stats.hltb_target_met}
-                icon="checkmark-done-circle"
-                color={themeColors.orange}
-                subtitle={`${stats.completed} ${t('stat_completed', language)}`}
-              />
-            </View>
-          </View>
-        )}
-
-        {/* Currently Playing */}
-        {playing.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader
-              title={t('dash_currently_playing', language)}
-              icon="play-circle"
-              iconColor={themeColors.green}
-              count={playing.length}
-            />
-            {playing.map((g) => (
-              <View key={g.id}>
-                <GameCard
-                  game={g}
-                  onStatusChange={setStatus}
-                />
-                <TouchableOpacity
-                  style={[styles.startPlayingBtn, { backgroundColor: themeColors.green }]}
-                  onPress={() => setTimerGame(g)}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="play-circle" size={18} color="#fff" />
-                  <Text style={styles.startPlayingText}>
-                    {language === 'es' ? '¡Empezar a Jugar!' : 'Start Playing!'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Up Next */}
+        {/* ── Up Next ─────────────────────────────────────────── */}
         {upNext.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader
-              title={t('dash_up_next', language)}
-              icon="bookmark"
-              iconColor={themeColors.blue}
-              count={upNext.length}
-              action={{
-                label: t('dash_see_all', language),
-                onPress: () => { },
-              }}
-            />
-            {upNext.slice(0, 5).map((g) => (
-              <GameCard
-                key={g.id}
-                game={g}
-                onStatusChange={setStatus}
-              />
-            ))}
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>{language === 'es' ? 'Próximos' : 'Up Next'}</Text>
+              <Text style={[styles.seeAll, { color: ED.ink3 }]}>
+                {language === 'es' ? 'Ver todos →' : 'See all →'}
+              </Text>
+            </View>
+            <View style={styles.listContainer}>
+              {upNext.map((g, i) => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[styles.listRow, i < upNext.length - 1 && styles.listRowBorder]}
+                  onPress={() => router.push(`/game/${g.id}`)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[edStyles.eyebrow, { color: ED.ink4, width: 22 }]}>
+                    {(i + 1).toString().padStart(2, '0')}
+                  </Text>
+                  <GameCover uri={g.cover_url} width={38} height={52} radius={4} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.listTitle} numberOfLines={1}>{g.title}</Text>
+                    <View style={styles.listMeta}>
+                      {g.hltb_main_story && (
+                        <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>
+                          <Text style={{ fontFamily: MONO_FONT }}>{g.hltb_main_story}h</Text>
+                        </Text>
+                      )}
+                      <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>· {g.platform.toUpperCase()}</Text>
+                      <Text style={[edStyles.eyebrow, { color: g.priority === 'high' ? ED.rust : ED.ink4 }]}>
+                        · {g.priority === 'high' ? '↑ High' : g.priority === 'medium' ? '→ Med' : '↓ Low'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color={ED.ink4} />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
-        {/* Paused */}
+        {/* ── Paused — pick back up ───────────────────────────── */}
         {paused.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader
-              title={t('dash_paused', language)}
-              icon="pause-circle"
-              iconColor={themeColors.violet}
-              count={paused.length}
-            />
-            {paused.slice(0, 3).map((g) => (
-              <GameCard key={g.id} game={g} onStatusChange={setStatus} compact />
-            ))}
+          <View style={[styles.section, { marginBottom: 40 }]}>
+            <View style={edStyles.sectionHead}>
+              <Text style={[edStyles.eyebrow, { color: ED.amber }]}>
+                {language === 'es' ? 'Pausados — ¿retomamos?' : 'Paused — pick back up?'}
+              </Text>
+              <Text style={[edStyles.eyebrow, { color: ED.ink4 }]}>{paused.length}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pausedScroll}>
+              {paused.map((g, i) => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={styles.pausedItem}
+                  onPress={() => router.push(`/game/${g.id}`)}
+                >
+                  <GameCover uri={g.cover_url} width={140} height={84} radius={8} />
+                  <Text style={styles.pausedTitle} numberOfLines={1}>{g.title}</Text>
+                  <View style={[edStyles.progressBar, { marginTop: 6 }]}>
+                    <View style={[edStyles.progressFill, { width: `${g.progress_percentage}%` as any }]} />
+                  </View>
+                  <Text style={[edStyles.eyebrow, { color: ED.ink3, marginTop: 4 }]}>
+                    <Text style={{ fontFamily: MONO_FONT }}>{g.progress_percentage}%</Text>
+                    {' '}· <Text style={{ fontFamily: MONO_FONT }}>{Math.round(g.playtime_minutes / 60)}h</Text>
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
-        {/* Empty state */}
+        {/* Empty state when no games at all */}
         {games.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons name="cloud-download-outline" size={56} color={themeColors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>{t('dash_empty_title', language)}</Text>
-            <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>
+          <View style={styles.emptyFull}>
+            <Ionicons name="cloud-download-outline" size={52} color={ED.ink4} />
+            <Text style={styles.emptyFullTitle}>{t('dash_empty_title', language)}</Text>
+            <Text style={[edStyles.eyebrow, { color: ED.ink3, textAlign: 'center', marginTop: 4 }]}>
               {t('dash_empty_text', language)}
             </Text>
           </View>
@@ -358,106 +369,66 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  scroll: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 3,
-  },
-  pickBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  banner: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 16,
-    marginBottom: 20,
-  },
-  bannerText: {
-    fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
-  },
-  statsGrid: {
-    gap: 10,
-    marginBottom: 28,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 60,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 20,
-  },
-  premiumBadgeRow: {
-    position: 'absolute',
-    top: -10,
-    right: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    zIndex: 10,
-    elevation: 5,
-  },
-  premiumBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  recTitle: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  recReason: { fontSize: 12, lineHeight: 18 },
-  dailyMeta: { fontSize: 12, fontWeight: '700', marginTop: 6 },
-  celebrationTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
-  celebrationText: { fontSize: 13, lineHeight: 20 },
-  startPlayingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    height: 44,
-    borderRadius: 14,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  startPlayingText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  root: { flex: 1, backgroundColor: ED.bg },
+  scroll: { paddingTop: 60, paddingHorizontal: 20 },
+
+  // Header
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 },
+  dateLabel: { marginBottom: 4 },
+  greeting: { fontSize: 26, fontWeight: '800', letterSpacing: -0.8, color: ED.ink },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: ED.surface2, borderWidth: 1, borderColor: ED.line },
+
+  // Section
+  section: { marginBottom: 28 },
+
+  // Currently playing
+  nowPlayingLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  heroBody: { padding: 18, paddingBottom: 0 },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  heroTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: ED.ink, lineHeight: 25, marginBottom: 6 },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 12, color: ED.ink3 },
+  heroPercent: { fontSize: 26, fontWeight: '800', letterSpacing: -0.8, color: ED.copper },
+  heroStats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  heroCta: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: ED.line, marginTop: 14 },
+  lastPlayed: { paddingHorizontal: 16, paddingBottom: 12 },
+
+  // Compact playing card
+  compactCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginTop: 8 },
+  compactTitle: { fontSize: 14, fontWeight: '700', letterSpacing: -0.3, color: ED.ink },
+
+  // Empty hero
+  emptyHero: { alignItems: 'center', padding: 32, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '700' },
+
+  // Snapshot grid
+  snapshotGrid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: 1, borderColor: ED.line, borderRadius: ED.radius, overflow: 'hidden' },
+  snapshotCell: { width: '50%', backgroundColor: ED.surface1, padding: 16, borderRightWidth: 1, borderBottomWidth: 1, borderColor: ED.line },
+  snapshotNum: { fontWeight: '800', fontSize: 30, letterSpacing: -1, color: ED.ink, lineHeight: 34, marginBottom: 2 },
+  snapshotSub: { fontSize: 10, color: ED.ink3 },
+
+  // Daily pick
+  pickCard: { flexDirection: 'row', gap: 14, padding: 14 },
+  pickTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: ED.ink, marginBottom: 4 },
+  pickReason: { fontSize: 12, color: ED.ink2, lineHeight: 18 },
+  pickChips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8 },
+
+  // Up next list
+  listContainer: { borderWidth: 1, borderColor: ED.line, borderRadius: ED.radius, overflow: 'hidden', backgroundColor: ED.surface1 },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: ED.surface1 },
+  listRowBorder: { borderBottomWidth: 1, borderBottomColor: ED.line },
+  listTitle: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2, color: ED.ink, marginBottom: 3 },
+  listMeta: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  seeAll: { fontSize: 12, color: ED.ink3 },
+
+  // Paused
+  pausedScroll: { marginHorizontal: -20 },
+  pausedItem: { marginLeft: 20, width: 140 },
+  pausedTitle: { fontSize: 13, fontWeight: '600', letterSpacing: -0.2, color: ED.ink, marginTop: 8 },
+
+  // Empty full
+  emptyFull: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyFullTitle: { fontSize: 18, fontWeight: '700', color: ED.ink },
 });

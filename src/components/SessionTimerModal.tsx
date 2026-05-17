@@ -7,14 +7,14 @@ import {
   StyleSheet,
   Alert,
   Pressable,
+  Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '../hooks/useAppContext';
 import { t, Language } from '../i18n';
 import { Game } from '../types';
 import { logSessionAndUpdateGame } from '../services/gamingSessionService';
+import { useAppContext } from '../hooks/useAppContext';
+import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 interface Props {
   visible: boolean;
@@ -26,23 +26,22 @@ function pad(n: number): string {
   return n.toString().padStart(2, '0');
 }
 
-function formatElapsed(seconds: number): string {
+function formatElapsed(seconds: number): { main: string; sec: string } {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
-  return `${pad(m)}:${pad(s)}`;
+  if (h > 0) return { main: `${pad(h)}:${pad(m)}`, sec: `:${pad(s)}` };
+  return { main: `${pad(m)}`, sec: `:${pad(s)}` };
 }
 
 export function SessionTimerModal({ visible, game, onClose }: Props) {
-  const { themeColors, language } = useAppContext();
+  const { language } = useAppContext();
   const lang = language as Language;
 
-  const [elapsed, setElapsed] = useState(0);   // seconds
+  const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start timer automatically when modal opens
   useEffect(() => {
     if (visible) {
       setElapsed(0);
@@ -55,21 +54,20 @@ export function SessionTimerModal({ visible, game, onClose }: Props) {
 
   useEffect(() => {
     if (running) {
-      intervalRef.current = setInterval(() => {
-        setElapsed((e) => e + 1);
-      }, 1000);
+      intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
     } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [running]);
 
   const elapsedMinutes = Math.max(1, Math.round(elapsed / 60));
+  const { main, sec } = formatElapsed(elapsed);
+
+  const sessionNum = game.playtime_minutes > 0 ? Math.ceil(game.playtime_minutes / 60) + 1 : 1;
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const now = new Date();
+  const dayStr = `Session #${sessionNum} · ${dayNames[now.getDay()]} evening`;
 
   const handleEnd = useCallback(() => {
     setRunning(false);
@@ -77,19 +75,12 @@ export function SessionTimerModal({ visible, game, onClose }: Props) {
       t('session_end_confirm', lang),
       `${t('session_end_msg', lang)} ${elapsedMinutes} ${t('session_end_msg2', lang)}`,
       [
-        {
-          text: t('session_cancel_btn', lang),
-          onPress: () => setRunning(true),
-        },
+        { text: t('session_cancel_btn', lang), onPress: () => setRunning(true) },
         {
           text: t('session_save', lang),
-          style: 'default',
           onPress: () => {
             logSessionAndUpdateGame(game, elapsedMinutes);
-            Alert.alert(
-              t('session_saved', lang),
-              `${elapsedMinutes} ${t('session_saved_msg', lang)}`
-            );
+            Alert.alert(t('session_saved', lang), `${elapsedMinutes} ${t('session_saved_msg', lang)}`);
             onClose(elapsedMinutes);
           },
         },
@@ -109,91 +100,90 @@ export function SessionTimerModal({ visible, game, onClose }: Props) {
     );
   }, [lang, onClose]);
 
-  // Colour that pulses between accent and green
-  const accentColor = themeColors.green;
+  const progressHours = Math.round(game.playtime_minutes / 60);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={handleDiscard}
-    >
-      {/* Backdrop */}
-      <Pressable style={styles.overlay} onPress={() => {}}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-      </Pressable>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleDiscard}>
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={() => {}} />
 
-      <View style={styles.container}>
-        <View style={[styles.sheet, { borderColor: themeColors.glassBorder }]}>
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-          <LinearGradient
-            colors={[accentColor + '20', 'transparent']}
-            style={StyleSheet.absoluteFill}
-          />
+      <View style={s.root}>
+        {/* Top bar */}
+        <View style={s.topBar}>
+          <TouchableOpacity style={s.closeBtn} onPress={handleDiscard}>
+            <Ionicons name="close" size={16} color={ED.ink} />
+          </TouchableOpacity>
+          <View style={s.activePill}>
+            <View style={s.activeDot} />
+            <Text style={s.activePillText}>SESSION ACTIVE</Text>
+          </View>
+          <View style={{ width: 36 }} />
+        </View>
 
-          {/* Handle */}
-          <View style={styles.handle} />
+        {/* Game info */}
+        <View style={s.gameInfo}>
+          <Text style={edStyles.eyebrow}>NOW PLAYING</Text>
+          <Text style={s.gameTitle} numberOfLines={2}>{game.title}</Text>
+          <Text style={s.gameSub}>{dayStr}</Text>
+        </View>
 
-          {/* Game title */}
-          <Text style={[styles.sessionLabel, { color: themeColors.textMuted }]}>
-            {t('session_title', lang).toUpperCase()}
-          </Text>
-          <Text style={[styles.gameTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-            {game.title}
-          </Text>
-
-          {/* Timer display */}
-          <View style={styles.timerWrap}>
-            <LinearGradient
-              colors={[accentColor + '18', accentColor + '08']}
-              style={styles.timerBg}
-            />
-            {!running && elapsed > 0 && (
-              <Text style={[styles.pausedLabel, { color: themeColors.orange }]}>
-                {t('session_paused_label', lang)}
+        {/* Clock */}
+        <View style={s.clockWrap}>
+          {/* Progress ring approximated with a View border */}
+          <View style={[s.ringOuter, !running && s.ringPaused]}>
+            <View style={s.clockInner}>
+              <View style={s.timeRow}>
+                <Text style={s.timeMain}>{main}</Text>
+                <Text style={s.timeSec}>{sec}</Text>
+              </View>
+              <Text style={[edStyles.eyebrow, { marginTop: 12 }]}>
+                {running ? 'SESSION DURATION' : 'PAUSED'}
               </Text>
-            )}
-            <Text style={[styles.timerText, { color: running ? accentColor : themeColors.textMuted }]}>
-              {formatElapsed(elapsed)}
-            </Text>
-            <Text style={[styles.elapsedLabel, { color: themeColors.textMuted }]}>
-              {t('session_elapsed', lang)}
-            </Text>
+            </View>
           </View>
 
-          {/* Play / Pause */}
+          {/* Stats below clock */}
+          <View style={s.statsRow}>
+            <View style={s.statItem}>
+              <Text style={s.statVal}>
+                +{Math.max(0, Math.round(elapsed / 1800))}
+                <Text style={s.statUnit}>%</Text>
+              </Text>
+              <Text style={edStyles.eyebrow}>PROGRESS</Text>
+            </View>
+            <View style={s.statDivider} />
+            <View style={s.statItem}>
+              <Text style={[s.statVal, { color: ED.moss }]}>
+                {progressHours}
+                <Text style={s.statUnit}>h</Text>
+              </Text>
+              <Text style={edStyles.eyebrow}>TOTAL PLAYED</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Controls */}
+        <View style={s.controls}>
           <TouchableOpacity
-            style={[styles.pauseBtn, { backgroundColor: running ? themeColors.orange + '22' : accentColor + '22', borderColor: running ? themeColors.orange : accentColor }]}
-            onPress={() => setRunning((r) => !r)}
+            style={[s.sideBtn]}
+            onPress={() => setRunning(r => !r)}
             activeOpacity={0.8}
           >
-            <Ionicons
-              name={running ? 'pause' : 'play'}
-              size={28}
-              color={running ? themeColors.orange : accentColor}
-            />
-            <Text style={[styles.pauseBtnText, { color: running ? themeColors.orange : accentColor }]}>
-              {running ? t('session_pause', lang) : t('session_resume', lang)}
-            </Text>
+            <Ionicons name={running ? 'pause' : 'play'} size={20} color={ED.ink2} />
           </TouchableOpacity>
 
-          {/* End session */}
           <TouchableOpacity
-            style={[styles.endBtn, { backgroundColor: accentColor }]}
+            style={[edStyles.btn, edStyles.btnPrimary, s.endBtn]}
             onPress={handleEnd}
             activeOpacity={0.85}
           >
-            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-            <Text style={styles.endBtnText}>{t('session_end', lang)}</Text>
+            <Ionicons name="checkmark" size={16} color="#1A1108" />
+            <Text style={[edStyles.btnText, edStyles.btnPrimaryText, { fontSize: 15 }]}>
+              End & save
+            </Text>
           </TouchableOpacity>
 
-          {/* Discard link */}
-          <TouchableOpacity onPress={handleDiscard} style={styles.discardLink}>
-            <Text style={[styles.discardText, { color: themeColors.textMuted }]}>
-              {t('session_discard', lang)}
-            </Text>
+          <TouchableOpacity style={s.sideBtn} onPress={() => {}} activeOpacity={0.8}>
+            <Ionicons name="create-outline" size={20} color={ED.ink2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -201,113 +191,80 @@ export function SessionTimerModal({ visible, game, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  container: {
+const s = StyleSheet.create({
+  root: {
     flex: 1,
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(8,6,4,0.97)',
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    justifyContent: 'space-between',
   },
-  sheet: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    overflow: 'hidden',
-    paddingHorizontal: 28,
-    paddingBottom: 44,
+
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingBottom: 14,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 99,
-    alignSelf: 'center',
-    marginTop: 14,
-    marginBottom: 24,
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  sessionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 6,
+  activePill: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: ED.copper },
+  activePillText: {
+    fontFamily: MONO_FONT, fontSize: 11, fontWeight: '600',
+    color: ED.copper, letterSpacing: 1.2,
   },
+
+  gameInfo: { alignItems: 'center', gap: 6, paddingVertical: 16 },
   gameTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: 28,
-    paddingHorizontal: 8,
+    fontSize: 28, fontWeight: '800', color: ED.ink,
+    letterSpacing: -1, lineHeight: 32, textAlign: 'center',
   },
-  timerWrap: {
-    width: '100%',
-    alignItems: 'center',
-    borderRadius: 24,
-    overflow: 'hidden',
-    paddingVertical: 28,
-    marginBottom: 28,
-    position: 'relative',
+  gameSub: { fontFamily: MONO_FONT, fontSize: 11, color: ED.ink3 },
+
+  clockWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 36 },
+  ringOuter: {
+    width: 220, height: 220, borderRadius: 110,
+    borderWidth: 2, borderColor: ED.copper,
+    alignItems: 'center', justifyContent: 'center',
+    // Outer dim ring
+    shadowColor: ED.copper,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
-  timerBg: {
-    ...StyleSheet.absoluteFillObject,
+  ringPaused: { borderColor: ED.ink3 },
+  clockInner: { alignItems: 'center' },
+  timeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  timeMain: {
+    fontFamily: MONO_FONT, fontSize: 68, fontWeight: '700',
+    color: ED.ink, letterSpacing: -3, lineHeight: 72,
   },
-  pausedLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  timerText: {
-    fontSize: 64,
-    fontWeight: '900',
-    letterSpacing: -2,
-    fontVariant: ['tabular-nums'],
-  },
-  elapsedLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 6,
-    letterSpacing: 0.5,
-  },
-  pauseBtn: {
+  timeSec: { fontFamily: MONO_FONT, fontSize: 22, color: ED.ink3, lineHeight: 28 },
+
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  statItem: { alignItems: 'center', gap: 6 },
+  statVal: { fontSize: 22, fontWeight: '700', color: ED.ink, letterSpacing: -0.5 },
+  statUnit: { fontSize: 13, color: ED.ink3, fontWeight: '400' },
+  statDivider: { width: 1, height: 36, backgroundColor: ED.line },
+
+  controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: 12,
+    paddingBottom: 8,
   },
-  pauseBtnText: {
-    fontSize: 17,
-    fontWeight: '700',
+  sideBtn: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  endBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  endBtnText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  discardLink: {
-    paddingVertical: 10,
-  },
-  discardText: {
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
+  endBtn: { flex: 1, height: 52, borderRadius: 14 },
 });

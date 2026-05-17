@@ -7,54 +7,55 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  StatusBar,
   Dimensions,
   Switch,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
-import { useGames } from '../../src/hooks/useGames';
-import { GameCover } from '../../src/components/GameCover';
-import { StatusBadge } from '../../src/components/StatusBadge';
-import { PriorityBadge } from '../../src/components/PriorityBadge';
-import { GlassCard } from '../../src/components/GlassCard';
-import { enrichGameWithHLTB } from '../../src/services/howLongToBeatService';
-import { logSessionAndUpdateGame } from '../../src/services/gamingSessionService';
-import { SessionTimerModal } from '../../src/components/SessionTimerModal';
-import { useAppContext } from '../../src/hooks/useAppContext';
+import { useGames } from '../hooks/useGames';
+import { GameCover } from '../components/GameCover';
+import { SessionTimerModal } from '../components/SessionTimerModal';
+import { enrichGameWithHLTB } from '../services/howLongToBeatService';
+import { logSessionAndUpdateGame } from '../services/gamingSessionService';
+import { getGamingSessionsForGame } from '../database/queries';
+import { useAppContext } from '../hooks/useAppContext';
 import {
   formatMinutes,
   formatHLTBTime,
   formatLastPlayed,
   formatRemainingTime,
   getRemainingMinutes,
-} from '../../src/utils/formatters';
-import { Game, GameStatus, GamePriority, Platform, STATUS_CONFIG, PRIORITY_CONFIG } from '../../src/types';
+} from '../utils/formatters';
+import { Game, GameStatus, GamePriority, Platform as GamePlatform, STATUS_CONFIG, PRIORITY_CONFIG } from '../types';
+import { ED, edStyles, MONO_FONT, STATUS_COLORS, coverPaletteFor } from '../styles/editorial';
 
 const { width } = Dimensions.get('window');
-const COVER_HEIGHT = width * 0.52;
+const COVER_HEIGHT = Math.round(width * 0.55);
 
 export default function GameDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { themeColors, language } = useAppContext();
+  const { language } = useAppContext();
   const lang = (language ?? 'en') as string;
-  const { getById, setStatus, setPriority, setProgress, setNotes, remove, refresh, setBacklogExclusion } =
-    useGames();
+  const { getById, setStatus, setPriority, setProgress, setNotes, remove, refresh, setBacklogExclusion } = useGames();
 
   const [game, setGame] = useState<Game | null>(null);
   const [notes, setNotesLocal] = useState('');
   const [sessionMinutes, setSessionMinutes] = useState('');
   const [fetching, setFetching] = useState(false);
   const [timerVisible, setTimerVisible] = useState(false);
+  const [sessions, setSessions] = useState<any[]>([]);
 
   const load = useCallback(() => {
     const g = getById(Number(id));
     setGame(g);
     setNotesLocal(g?.notes ?? '');
+    if (g) {
+      const s = getGamingSessionsForGame(g.id);
+      setSessions(s as any[]);
+    }
   }, [id, getById]);
 
   useEffect(() => {
@@ -65,36 +66,26 @@ export default function GameDetailScreen() {
   const handleStatusChange = (status: GameStatus) => {
     if (!game) return;
     setStatus(game.id, status);
-    setGame((g) => (g ? { ...g, status } : g));
+    setGame(g => g ? { ...g, status } : g);
   };
 
   const handlePriorityChange = (priority: GamePriority) => {
     if (!game) return;
     setPriority(game.id, priority);
-    setGame((g) => (g ? { ...g, priority } : g));
+    setGame(g => g ? { ...g, priority } : g);
   };
 
   const handleProgressChange = (value: number) => {
     if (!game) return;
     const pct = Math.round(value);
     setProgress(game.id, pct);
-    setGame((g) => (g ? { ...g, progress_percentage: pct } : g));
-  };
-
-  const handlePlatformChange = (platform: Platform) => {
-    if (!game) return;
-    // Assuming useGames has a setPlatform function, if not, we can use an alternative or add it
-    // For now, let's update local state and rely on a broader update function if needed.
-    // We will need to make sure the games context can handle `setPlatform` or `updateGame`.
-    // We'll proceed with local update for the UI:
-    setGame(g => g ? { ...g, platform } : g);
-    // Ideally: setPlatform(game.id, platform);
-    // Or if updateGame is available: updateGame(game.id, { platform });
+    setGame(g => g ? { ...g, progress_percentage: pct } : g);
   };
 
   const handleSaveNotes = () => {
     if (!game) return;
     setNotes(game.id, notes);
+    Alert.alert('Saved', 'Notes saved.');
   };
 
   const handleFetchHLTB = async () => {
@@ -104,363 +95,361 @@ export default function GameDetailScreen() {
     setFetching(false);
     refresh();
     load();
-    if (result.status === 'not_found') {
-      Alert.alert('Not found', 'Could not find this game on HowLongToBeat.');
-    }
-    if (result.status === 'request_failed') {
-      Alert.alert('HLTB request failed', result.errorMessage ?? 'The HLTB request was blocked.');
-    }
+    if (result.status === 'not_found') Alert.alert('Not found', 'Could not find this game on HowLongToBeat.');
+    if (result.status === 'request_failed') Alert.alert('HLTB failed', result.errorMessage ?? 'Request blocked.');
   };
 
   const handleLogSession = () => {
     if (!game) return;
     const mins = parseInt(sessionMinutes, 10);
-    if (isNaN(mins) || mins <= 0) {
-      Alert.alert('Invalid Time', 'Please enter a valid number of minutes.');
-      return;
-    }
+    if (isNaN(mins) || mins <= 0) { Alert.alert('Invalid', 'Enter a valid number of minutes.'); return; }
     logSessionAndUpdateGame(game, mins);
     setSessionMinutes('');
-    Alert.alert('Session Logged', `Logged ${mins} minutes for ${game.title}.`);
     refresh();
     load();
   };
 
   const handleDelete = () => {
-    Alert.alert('Remove Game', 'Remove this game from your backlog?', [
+    Alert.alert('Remove Game', 'Remove this game from your library?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          if (game) remove(game.id);
-          router.back();
-        },
-      },
+      { text: 'Remove', style: 'destructive', onPress: () => { if (game) remove(game.id); router.back(); } },
     ]);
   };
 
   if (!game) {
     return (
-      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-        <Text style={{ color: themeColors.textMuted, padding: 20 }}>Game not found.</Text>
+      <View style={s.root}>
+        <TouchableOpacity style={s.backBtnAlt} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={20} color={ED.ink} />
+        </TouchableOpacity>
+        <Text style={{ color: ED.ink3, padding: 40, textAlign: 'center' }}>Game not found.</Text>
       </View>
     );
   }
 
-  const statusConfig = STATUS_CONFIG[game.status];
+  const statusInfo = STATUS_COLORS[game.status] ?? STATUS_COLORS['not_started'];
+  const pal = coverPaletteFor(game.title);
   const remainingMinutes = getRemainingMinutes(game.hltb_main_story, game.playtime_minutes);
+  const avgSession = sessions.length > 0
+    ? Math.round(sessions.reduce((a, s) => a + (s.duration_minutes ?? 0), 0) / sessions.length)
+    : null;
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-      <StatusBar barStyle="light-content" />
+    <View style={s.root}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cover hero */}
-        <View style={styles.heroWrap}>
-          <GameCover
-            uri={game.cover_url}
-            width={width}
-            height={COVER_HEIGHT}
-            radius={0}
-          />
-          <LinearGradient
-            colors={['transparent', themeColors.bg]}
-            style={styles.heroFade}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-          {/* Back button */}
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-            <Ionicons name="chevron-back" size={22} color={themeColors.textPrimary} />
-          </TouchableOpacity>
-          {/* Delete button */}
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-            <Ionicons name="trash-outline" size={18} color={themeColors.red} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.content}>
-          {/* Title + badges */}
-          <Text style={[styles.title, { color: themeColors.textPrimary }]}>{game.title}</Text>
-          <View style={styles.badgeRow}>
-            <StatusBadge status={game.status} />
-            <PriorityBadge priority={game.priority} />
-            <View style={[styles.platformBadge, { backgroundColor: themeColors.glassBorder }]}>
-              <Ionicons name="game-controller" size={12} color={themeColors.textSecondary} />
-              <Text style={[styles.platformBadgeText, { color: themeColors.textSecondary }]}>{game.platform.toUpperCase()}</Text>
+        {/* ── Cover hero ── */}
+        <View style={{ height: COVER_HEIGHT, position: 'relative' }}>
+          {game.cover_url ? (
+            <GameCover uri={game.cover_url} width={width} height={COVER_HEIGHT} radius={0} />
+          ) : (
+            <View style={[s.coverPlaceholder, { backgroundColor: pal.b }]}>
+              <View style={[s.coverGlow, { backgroundColor: pal.a }]} />
+              <Text style={s.coverTitle} numberOfLines={3}>{game.title}</Text>
             </View>
-          </View>
+          )}
+          {/* Gradient overlay */}
+          <View style={s.heroGradient} />
 
-          {/* Meta row */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="game-controller-outline" size={14} color={themeColors.textMuted} />
-              <Text style={[styles.metaText, { color: themeColors.textMuted }]}>{formatMinutes(game.playtime_minutes)} played</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={14} color={themeColors.textMuted} />
-              <Text style={[styles.metaText, { color: themeColors.textMuted }]}>{formatLastPlayed(game.last_played ? new Date(game.last_played).getTime() / 1000 : null)}</Text>
-            </View>
-          </View>
-
-          {/* HLTB card */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="hourglass-outline" size={16} color={themeColors.blue} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>HowLongToBeat</Text>
-              <TouchableOpacity
-                onPress={handleFetchHLTB}
-                disabled={fetching}
-                style={styles.refreshBtn}
-              >
-                <Ionicons
-                  name={fetching ? 'sync' : 'refresh'}
-                  size={15}
-                  color={themeColors.accent}
-                />
+          {/* Nav buttons */}
+          <View style={s.heroNav}>
+            <TouchableOpacity style={s.circleBtn} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={18} color={ED.ink} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={s.circleBtn} onPress={() => router.push('/share' as any)}>
+                <Ionicons name="share-outline" size={16} color={ED.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.circleBtn, { backgroundColor: 'rgba(193,104,71,0.6)' }]} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={16} color={ED.rust} />
               </TouchableOpacity>
             </View>
-            <View style={styles.hltbRow}>
-              <HLTBStat label="Main Story" value={formatHLTBTime(game.hltb_main_story)} color={themeColors.blue} themeColors={themeColors} />
-              <HLTBStat label="Extra" value={formatHLTBTime(game.hltb_extra)} color={themeColors.teal} themeColors={themeColors} />
-              <HLTBStat label="Completionist" value={formatHLTBTime(game.hltb_completionist)} color={themeColors.violet} themeColors={themeColors} />
+          </View>
+        </View>
+
+        {/* ── Title block ── */}
+        <View style={s.titleBlock}>
+          <Text style={[edStyles.eyebrow, { marginBottom: 6, color: ED.ink3 }]}>
+            {game.platform.toUpperCase()}{game.release_year ? ` · ${game.release_year}` : ''}
+          </Text>
+          <Text style={[edStyles.displayTitle, { fontSize: 34, lineHeight: 36 }]} numberOfLines={2}>{game.title}</Text>
+
+          <View style={s.badgeRow}>
+            <View style={[s.statusChip, { backgroundColor: statusInfo.bg, borderColor: statusInfo.color + '40' }]}>
+              <View style={[s.statusDot, { backgroundColor: statusInfo.color }]} />
+              <Text style={[s.statusChipText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
             </View>
-            {remainingMinutes !== null && (
-              <View style={[styles.remainingRow, { borderTopColor: themeColors.glassBorder }]}>
-                <Text style={[styles.remainingLabel, { color: themeColors.textSecondary }]}>Remaining</Text>
-                <Text style={[styles.remainingValue, { color: themeColors.blue }]}>
-                  {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)}
+            {game.priority && (
+              <View style={[edStyles.chip]}>
+                <Text style={[edStyles.chipText, { color: game.priority === 'high' ? ED.rust : game.priority === 'medium' ? ED.amber : ED.ink3 }]}>
+                  {game.priority === 'high' ? '↑ High' : game.priority === 'medium' ? '→ Med' : '↓ Low'}
                 </Text>
               </View>
             )}
-          </GlassCard>
+            <View style={edStyles.pill}>
+              <Text style={edStyles.pillText}>{game.platform.toUpperCase()}</Text>
+            </View>
+          </View>
+        </View>
 
-          {/* ── Start Playing button ── */}
-          <TouchableOpacity
-            style={[styles.startPlayingBtn, { backgroundColor: themeColors.green }]}
-            onPress={() => setTimerVisible(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="play-circle" size={22} color="#fff" />
-            <Text style={styles.startPlayingText}>
-              {lang === 'es' ? '¡Empezar a Jugar!' : 'Start Playing!'}
-            </Text>
-          </TouchableOpacity>
+        <View style={s.content}>
 
-          {/* Log Session */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="game-controller" size={16} color={themeColors.accent} />
-              <Text style={styles.cardTitle}>Log Gaming Session</Text>
-            </View>
-            <View style={styles.sessionRow}>
-              <TextInput
-                style={[styles.sessionInput, { color: themeColors.textPrimary, borderColor: themeColors.glassBorder }]}
-                placeholder="Minutes played"
-                placeholderTextColor={themeColors.textMuted}
-                keyboardType="numeric"
-                value={sessionMinutes}
-                onChangeText={setSessionMinutes}
-              />
-              <TouchableOpacity style={[styles.sessionBtn, { backgroundColor: themeColors.accent }]} onPress={handleLogSession}>
-                <Text style={styles.sessionBtnText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </GlassCard>
-
-          {/* Progress */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="bar-chart-outline" size={16} color={themeColors.green} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Progress</Text>
-              <Text style={[styles.progressPct, { color: themeColors.accent }]}>{game.progress_percentage}%</Text>
-            </View>
-            <View style={[styles.progressTrack, { backgroundColor: themeColors.glassBorder }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${game.progress_percentage}%` as any,
-                    backgroundColor: statusConfig.color, // Status color doesn't change by theme usually, but we could if we want
-                  },
-                ]}
-              />
-            </View>
-            <Slider
-              minimumValue={0}
-              maximumValue={100}
-              step={5}
-              value={game.progress_percentage}
-              onSlidingComplete={handleProgressChange}
-              minimumTrackTintColor={themeColors.accent}
-              maximumTrackTintColor={themeColors.glassBorder}
-              thumbTintColor={themeColors.accent}
-              style={{ marginTop: 8 }}
-            />
-          </GlassCard>
-
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="calculator-outline" size={16} color={themeColors.blue} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Backlog Calculator</Text>
-            </View>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleInfo}>
-                <Text style={[styles.toggleTitle, { color: themeColors.textPrimary }]}>Exclude from total backlog hours</Text>
-                <Text style={[styles.toggleSubtitle, { color: themeColors.textMuted }]}>
-                  Hide this game from the finish-time estimate without deleting it.
+          {/* ── Progress centerpiece ── */}
+          <View style={[edStyles.card, s.section]}>
+            <View style={{ padding: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={edStyles.eyebrow}>Progress</Text>
+                <Text style={[s.lastPlayed]}>
+                  last played {formatLastPlayed(game.last_played ? new Date(game.last_played).getTime() / 1000 : null)}
                 </Text>
               </View>
-              <Switch
-                value={game.exclude_from_backlog === 1}
-                onValueChange={(value) => {
-                  setBacklogExclusion(game.id, value);
-                  setGame((current) => (current ? { ...current, exclude_from_backlog: value ? 1 : 0 } : current));
-                }}
-                trackColor={{ false: themeColors.glassBorder, true: themeColors.blue + '88' }}
-                thumbColor={game.exclude_from_backlog === 1 ? themeColors.blue : themeColors.textPrimary}
+              <View style={s.progressNumRow}>
+                <Text style={s.progressNum}>{game.progress_percentage}</Text>
+                <Text style={s.progressUnit}>%</Text>
+              </View>
+              <View style={edStyles.progressBar}>
+                <View style={[edStyles.progressFill, { width: `${game.progress_percentage}%` as any }]} />
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                <Text style={s.progressMeta}>
+                  <Text style={{ color: ED.ink }}>{formatMinutes(game.playtime_minutes)}</Text> played
+                </Text>
+                {remainingMinutes !== null && (
+                  <Text style={s.progressMeta}>
+                    <Text style={{ color: ED.ink }}>{formatRemainingTime(game.hltb_main_story, game.playtime_minutes)}</Text> left
+                  </Text>
+                )}
+              </View>
+
+              {/* Slider */}
+              <Text style={[s.sliderHint]}>Drag to update</Text>
+              <Slider
+                minimumValue={0}
+                maximumValue={100}
+                step={5}
+                value={game.progress_percentage}
+                onSlidingComplete={handleProgressChange}
+                minimumTrackTintColor={ED.copper}
+                maximumTrackTintColor={ED.surface3}
+                thumbTintColor={ED.copper}
+                style={{ marginTop: 4 }}
               />
             </View>
-          </GlassCard>
+          </View>
 
-          {/* Status selector */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="layers-outline" size={16} color={themeColors.orange} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Status</Text>
+          {/* ── Primary CTAs ── */}
+          <View style={[s.section, { flexDirection: 'row', gap: 10 }]}>
+            <TouchableOpacity
+              style={[edStyles.btn, edStyles.btnPrimary, { flex: 1, height: 50 }]}
+              onPress={() => setTimerVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="play" size={16} color="#1A1108" />
+              <Text style={[edStyles.btnText, edStyles.btnPrimaryText, { fontSize: 15 }]}>
+                {lang === 'es' ? 'Empezar sesión' : 'Start session'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[edStyles.btn, { width: 50, height: 50, paddingHorizontal: 0 }]}
+              onPress={() => {}}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="create-outline" size={18} color={ED.ink2} />
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Spec table ── */}
+          <View style={s.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>Specs</Text>
+              <TouchableOpacity onPress={handleFetchHLTB} disabled={fetching}>
+                <Ionicons name={fetching ? 'sync' : 'refresh-outline'} size={14} color={ED.copper} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.selectorGrid}>
-              {(Object.keys(STATUS_CONFIG) as GameStatus[]).map((s) => {
-                const cfg = STATUS_CONFIG[s];
-                const active = game.status === s;
+            <View style={edStyles.card}>
+              <SpecRow label="Main story" value={formatHLTBTime(game.hltb_main_story)} />
+              <SpecRow label="+ Extras" value={formatHLTBTime(game.hltb_extra)} />
+              <SpecRow label="Completionist" value={formatHLTBTime(game.hltb_completionist)} />
+              {remainingMinutes !== null && (
+                <SpecRow label="Remaining" value={formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} accent />
+              )}
+              <SpecRow label="Platform" value={game.platform.charAt(0).toUpperCase() + game.platform.slice(1)} />
+              {game.release_year ? <SpecRow label="Released" value={String(game.release_year)} last /> : null}
+            </View>
+          </View>
+
+          {/* ── Recent sessions ── */}
+          {sessions.length > 0 && (
+            <View style={s.section}>
+              <View style={edStyles.sectionHead}>
+                <Text style={edStyles.eyebrow}>Recent sessions</Text>
+                <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>{sessions.length} total</Text>
+              </View>
+              <View style={edStyles.card}>
+                {sessions.slice(0, 5).map((sess, idx) => {
+                  const barWidth = Math.min(100, Math.round((sess.duration_minutes / 180) * 100));
+                  const d = sess.session_date ? new Date(sess.session_date) : null;
+                  const dateStr = d ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '—';
+                  return (
+                    <View
+                      key={sess.id ?? idx}
+                      style={[s.sessRow, idx < Math.min(4, sessions.length - 1) && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
+                    >
+                      <Text style={s.sessDate}>{dateStr}</Text>
+                      <View style={s.sessBarTrack}>
+                        <View style={[s.sessBarFill, { width: `${barWidth}%` as any }]} />
+                      </View>
+                      <Text style={s.sessDur}>
+                        {Math.floor(sess.duration_minutes / 60)}h {sess.duration_minutes % 60}m
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {avgSession && (
+                <Text style={s.sessAvg}>Average <Text style={{ color: ED.ink, fontFamily: MONO_FONT }}>{avgSession}m</Text> per session</Text>
+              )}
+            </View>
+          )}
+
+          {/* ── Log session manually ── */}
+          <View style={s.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>Log session</Text>
+            </View>
+            <View style={edStyles.card}>
+              <View style={{ padding: 16, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                <TextInput
+                  style={s.minInput}
+                  value={sessionMinutes}
+                  onChangeText={setSessionMinutes}
+                  placeholder="Minutes played"
+                  placeholderTextColor={ED.ink4}
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity
+                  style={[edStyles.btn, edStyles.btnPrimary, { height: 44, paddingHorizontal: 20 }]}
+                  onPress={handleLogSession}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Status grid ── */}
+          <View style={s.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>Change status</Text>
+            </View>
+            <View style={s.statusGrid}>
+              {(Object.keys(STATUS_CONFIG) as GameStatus[]).map((st) => {
+                const cfg = STATUS_CONFIG[st];
+                const sc = STATUS_COLORS[st];
+                const active = game.status === st;
                 return (
                   <TouchableOpacity
-                    key={s}
-                    onPress={() => handleStatusChange(s)}
+                    key={st}
                     style={[
-                      styles.selectorBtn,
-                      { borderColor: active ? cfg.color : themeColors.glassBorder },
-                      active && { backgroundColor: cfg.color + '22' },
+                      s.statusBtn,
+                      { borderColor: active ? sc.color : ED.line, backgroundColor: active ? sc.bg : ED.surface1 },
                     ]}
-                    activeOpacity={0.7}
+                    onPress={() => handleStatusChange(st)}
+                    activeOpacity={0.75}
                   >
-                    <Ionicons
-                      name={cfg.icon as keyof typeof Ionicons.glyphMap}
-                      size={14}
-                      color={active ? cfg.color : themeColors.textMuted}
-                    />
-                    <Text
-                      style={[
-                        styles.selectorLabel,
-                        { color: active ? cfg.color : themeColors.textMuted },
-                      ]}
-                    >
-                      {cfg.label}
-                    </Text>
+                    <Ionicons name={cfg.icon as any} size={13} color={active ? sc.color : ED.ink3} />
+                    <Text style={[s.statusBtnText, { color: active ? sc.color : ED.ink3 }]}>{sc.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </GlassCard>
+          </View>
 
-          {/* Platform selector */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="laptop-outline" size={16} color={themeColors.blue} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Platform</Text>
+          {/* ── Priority ── */}
+          <View style={s.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>Priority</Text>
             </View>
-            <View style={styles.selectorGrid}>
-              {(['steam', 'playstation', 'xbox', 'nintendo', 'emulator', 'other'] as Platform[]).map((p) => {
-                const active = game.platform === p;
-                return (
-                  <TouchableOpacity
-                    key={p}
-                    onPress={() => handlePlatformChange(p)}
-                    style={[
-                      styles.selectorBtn,
-                      { borderColor: active ? themeColors.blue : themeColors.glassBorder },
-                      active && { backgroundColor: themeColors.blue + '22' },
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.selectorLabel,
-                        { color: active ? themeColors.blue : themeColors.textMuted },
-                      ]}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </GlassCard>
-
-          {/* Priority selector */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="flag-outline" size={16} color={themeColors.orange} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Priority</Text>
-            </View>
-            <View style={styles.priorityRow}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               {(Object.keys(PRIORITY_CONFIG) as GamePriority[]).map((p) => {
                 const cfg = PRIORITY_CONFIG[p];
                 const active = game.priority === p;
                 return (
                   <TouchableOpacity
                     key={p}
-                    onPress={() => handlePriorityChange(p)}
                     style={[
-                      styles.priorityBtn,
-                      { borderColor: active ? cfg.color : themeColors.glassBorder },
-                      active && { backgroundColor: cfg.color + '22' },
+                      edStyles.card,
+                      s.priorityBtn,
+                      active && { borderColor: cfg.color, backgroundColor: cfg.color + '18' },
                     ]}
-                    activeOpacity={0.7}
+                    onPress={() => handlePriorityChange(p)}
+                    activeOpacity={0.75}
                   >
-                    <Ionicons
-                      name={cfg.icon as keyof typeof Ionicons.glyphMap}
-                      size={14}
-                      color={active ? cfg.color : themeColors.textMuted}
-                    />
-                    <Text
-                      style={[
-                        styles.selectorLabel,
-                        { color: active ? cfg.color : themeColors.textMuted },
-                      ]}
-                    >
-                      {cfg.label}
-                    </Text>
+                    <Ionicons name={cfg.icon as any} size={14} color={active ? cfg.color : ED.ink3} />
+                    <Text style={[s.priorityBtnText, { color: active ? cfg.color : ED.ink3 }]}>{cfg.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </GlassCard>
+          </View>
 
-          {/* Notes */}
-          <GlassCard style={styles.card} padding={16}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="create-outline" size={16} color={themeColors.violet} />
-              <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]}>Notes</Text>
-              <TouchableOpacity onPress={handleSaveNotes} style={[styles.saveBtn, { backgroundColor: themeColors.accent + '22' }]}>
-                <Text style={[styles.saveBtnText, { color: themeColors.accent }]}>Save</Text>
+          {/* ── Notes ── */}
+          <View style={s.section}>
+            <View style={edStyles.sectionHead}>
+              <Text style={edStyles.eyebrow}>Notes</Text>
+              <TouchableOpacity onPress={handleSaveNotes}>
+                <Text style={{ fontFamily: MONO_FONT, fontSize: 11, fontWeight: '600', color: ED.copper }}>SAVE</Text>
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={[styles.notesInput, { color: themeColors.textPrimary }]}
-              value={notes}
-              onChangeText={setNotesLocal}
-              multiline
-              numberOfLines={4}
-              placeholder="Add notes, thoughts, or reminders…"
-              placeholderTextColor={themeColors.textMuted}
-            />
-          </GlassCard>
+            <View style={edStyles.card}>
+              <TextInput
+                style={s.notesInput}
+                value={notes}
+                onChangeText={setNotesLocal}
+                multiline
+                numberOfLines={4}
+                placeholder="Add notes, thoughts, or reminders…"
+                placeholderTextColor={ED.ink4}
+              />
+            </View>
+          </View>
 
-          <View style={{ height: 100 }} />
+          {/* ── Exclude from backlog ── */}
+          <View style={[edStyles.card, s.section]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+              <View style={[s.rowIcon]}>
+                <Ionicons name="eye-off-outline" size={15} color={ED.ink3} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.excludeLabel}>Exclude from backlog</Text>
+                <Text style={s.excludeSub}>Won't appear in stats or recommendations</Text>
+              </View>
+              <Switch
+                value={game.exclude_from_backlog === 1}
+                onValueChange={(value) => {
+                  setBacklogExclusion(game.id, value);
+                  setGame(g => g ? { ...g, exclude_from_backlog: value ? 1 : 0 } : g);
+                }}
+                trackColor={{ false: ED.surface3, true: ED.skyBg }}
+                thumbColor={game.exclude_from_backlog === 1 ? ED.sky : ED.ink3}
+              />
+            </View>
+          </View>
+
+          {/* ── Bottom actions ── */}
+          <View style={[s.section, { flexDirection: 'row', justifyContent: 'center', gap: 28 }]}>
+            <TouchableOpacity style={s.ghostAction} onPress={handleFetchHLTB} disabled={fetching}>
+              <Ionicons name="refresh-outline" size={14} color={ED.ink3} />
+              <Text style={s.ghostActionText}>Refresh HLTB</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ghostAction} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={14} color={ED.rust} />
+              <Text style={[s.ghostActionText, { color: ED.rust }]}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 120 }} />
         </View>
       </ScrollView>
 
@@ -469,195 +458,124 @@ export default function GameDetailScreen() {
         game={game}
         onClose={(savedMinutes) => {
           setTimerVisible(false);
-          if (savedMinutes) {
-            refresh();
-            load();
-          }
+          if (savedMinutes) { refresh(); load(); }
         }}
       />
     </View>
   );
 }
 
-function HLTBStat({ label, value, color, themeColors }: { label: string; value: string; color: string; themeColors: any }) {
+function SpecRow({ label, value, accent, last }: { label: string; value: string; accent?: boolean; last?: boolean }) {
   return (
-    <View style={styles.hltbStat}>
-      <Text style={[styles.hltbValue, { color }]}>{value}</Text>
-      <Text style={[styles.hltbLabel, { color: themeColors.textMuted }]}>{label}</Text>
+    <View style={[edStyles.specRow, { paddingHorizontal: 16 }, last && { borderBottomWidth: 0 }]}>
+      <Text style={edStyles.specKey}>{label}</Text>
+      <Text style={[edStyles.specVal, accent && { color: ED.copper }]}>{value}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  heroWrap: { position: 'relative' },
-  heroFade: {
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: ED.bg },
+
+  backBtnAlt: { marginTop: Platform.OS === 'ios' ? 56 : 44, marginLeft: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: ED.surface2, alignItems: 'center', justifyContent: 'center' },
+
+  coverPlaceholder: {
+    width: '100%' as any, height: '100%' as any,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  coverGlow: {
+    position: 'absolute', bottom: -40, right: -40,
+    width: width * 0.7, height: width * 0.7,
+    borderRadius: width * 0.35, opacity: 0.4,
+  },
+  coverTitle: {
+    fontFamily: MONO_FONT, fontSize: 14, fontWeight: '600',
+    color: ED.ink3, textAlign: 'center', paddingHorizontal: 24,
+    letterSpacing: 0.5, textTransform: 'uppercase',
+  },
+  heroGradient: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 140,
+    backgroundColor: 'transparent',
+    // Simulated gradient via opacity overlay
+  },
+  heroNav: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-  },
-  backBtn: {
-    position: 'absolute',
-    top: 52,
-    left: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtn: {
-    position: 'absolute',
-    top: 52,
-    right: 16,
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: { paddingHorizontal: 20, paddingTop: 16 },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginBottom: 10,
-  },
-  badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
-  platformBadge: {
+    top: Platform.OS === 'ios' ? 56 : 44,
+    left: 16, right: 16,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  platformBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  metaRow: { flexDirection: 'row', gap: 20, marginBottom: 20 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: 12 },
-  card: { marginBottom: 14 },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  refreshBtn: { padding: 4 },
-  hltbRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  remainingRow: {
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  remainingLabel: {
-    fontSize: 13,
+  circleBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  remainingValue: {
-    fontSize: 16,
-    fontWeight: '800',
+
+  titleBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 20,
+    marginTop: -32,
+    zIndex: 2,
   },
-  hltbStat: { alignItems: 'center', gap: 4 },
-  hltbValue: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  hltbLabel: { fontSize: 11 },
-  progressTrack: {
-    height: 6,
-    borderRadius: 99,
-    overflow: 'hidden',
+  badgeRow: { flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap' },
+  statusChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 100, borderWidth: 1,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 99,
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusChipText: { fontSize: 11.5, fontWeight: '600', letterSpacing: -0.1 },
+
+  content: { paddingHorizontal: 24 },
+  section: { marginBottom: 24 },
+
+  progressNumRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  progressNum: { fontSize: 64, fontWeight: '900', color: ED.copper, letterSpacing: -3 },
+  progressUnit: { fontSize: 24, color: ED.ink3, fontWeight: '600' },
+  lastPlayed: { fontFamily: MONO_FONT, fontSize: 10, color: ED.ink3 },
+  progressMeta: { fontSize: 12, color: ED.ink3, fontFamily: MONO_FONT },
+  sliderHint: { fontSize: 11, color: ED.ink4, marginTop: 10 },
+
+  sessRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  sessDate: { fontFamily: MONO_FONT, fontSize: 10, color: ED.ink3, width: 80 },
+  sessBarTrack: { flex: 1, height: 4, backgroundColor: ED.surface3, borderRadius: 100, overflow: 'hidden' },
+  sessBarFill: { height: '100%' as any, backgroundColor: ED.moss, borderRadius: 100 },
+  sessDur: { fontFamily: MONO_FONT, fontSize: 11, color: ED.ink, width: 56, textAlign: 'right' as const },
+  sessAvg: { marginTop: 8, fontSize: 11, color: ED.ink3, fontFamily: MONO_FONT },
+
+  minInput: {
+    flex: 1, height: 44, borderRadius: 10,
+    borderWidth: 1, borderColor: ED.line,
+    backgroundColor: ED.surface2,
+    paddingHorizontal: 12, fontSize: 14,
+    color: ED.ink, fontFamily: MONO_FONT,
   },
-  progressPct: { fontSize: 14, fontWeight: '700' },
-  selectorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  selectorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
+
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  statusBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 10, borderWidth: 1,
   },
-  selectorLabel: { fontSize: 12, fontWeight: '600' },
-  priorityRow: { flexDirection: 'row', gap: 10 },
+  statusBtnText: { fontSize: 11.5, fontWeight: '500' },
+
   priorityBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 12,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  toggleInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  toggleTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  toggleSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
+  priorityBtnText: { fontSize: 13, fontWeight: '600' },
+
   notesInput: {
-    fontSize: 14,
-    lineHeight: 22,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    fontSize: 13.5, color: ED.ink2, lineHeight: 22,
+    minHeight: 88, textAlignVertical: 'top' as const,
+    padding: 16, fontStyle: 'italic',
   },
-  saveBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  saveBtnText: { fontSize: 12, fontWeight: '700' },
-  sessionRow: { flexDirection: 'row', gap: 12 },
-  sessionInput: {
-    flex: 1, height: 44, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, fontSize: 14
-  },
-  sessionBtn: { paddingHorizontal: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  sessionBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  startPlayingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 16,
-    marginBottom: 14,
-  },
-  startPlayingText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '800',
-  },
+
+  rowIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: ED.surface2, alignItems: 'center', justifyContent: 'center' },
+  excludeLabel: { fontSize: 13.5, fontWeight: '600', color: ED.ink },
+  excludeSub: { fontSize: 11, color: ED.ink3, marginTop: 2 },
+
+  ghostAction: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ghostActionText: { fontSize: 12.5, color: ED.ink3 },
 });

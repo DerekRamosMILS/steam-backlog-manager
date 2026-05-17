@@ -1,49 +1,42 @@
 import { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
-import { StyleSheet, View, Platform } from 'react-native';
+import { View, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ED } from '../../src/styles/editorial';
 import { useAppContext } from '../../src/hooks/useAppContext';
 import { t } from '../../src/i18n';
 
 function TabBarBackground() {
-  const { themeColors } = useAppContext();
   return (
-    <BlurView
-      intensity={50}
-      tint="dark"
-      style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
-    >
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: `${themeColors.bg}CC`, borderTopWidth: 1, borderColor: themeColors.glassBorder },
-        ]}
-      />
-    </BlurView>
+    <View style={[StyleSheet.absoluteFill, {
+      backgroundColor: ED.bg,
+      borderTopWidth: 1,
+      borderTopColor: ED.line,
+    }]} />
   );
 }
 
 export default function TabLayout() {
-  const { themeColors, language } = useAppContext();
+  const { language } = useAppContext();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: themeColors.accent,
-        tabBarInactiveTintColor: themeColors.textMuted,
+        tabBarActiveTintColor: ED.copper,
+        tabBarInactiveTintColor: ED.ink3,
         tabBarStyle: {
           position: 'absolute',
           borderTopWidth: 0,
           elevation: 0,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: Platform.OS === 'ios' ? 84 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           backgroundColor: 'transparent',
         },
         tabBarBackground: () => <TabBarBackground />,
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '600',
-          marginTop: 2,
+          fontWeight: '500',
+          letterSpacing: -0.1,
         },
       }}
     >
@@ -52,7 +45,7 @@ export default function TabLayout() {
         options={{
           title: t('tab_dash', language),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
@@ -61,34 +54,25 @@ export default function TabLayout() {
         options={{
           title: t('tab_lib', language),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="library" size={size} color={color} />
+            <Ionicons name="library-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="recommendations"
         options={{
-          title: t('tab_ai', language),
+          title: 'Pick',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="planner"
-        options={{
-          title: t('tab_plan', language),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+            <Ionicons name="sparkles-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="stats"
         options={{
-          title: t('tab_stats', language),
+          title: 'Insights',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart" size={size} color={color} />
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
         }}
       />
@@ -97,7 +81,7 @@ export default function TabLayout() {
         options={{
           title: t('tab_set', language),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />

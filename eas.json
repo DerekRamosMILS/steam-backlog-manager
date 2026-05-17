@@ -28,7 +28,7 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./games-backlog-489521-1552f473de40.json",
+        "serviceAccountKeyPath": "./games-backlog-489521-6d15635725f3.json",
         "track": "internal"
       }
     }

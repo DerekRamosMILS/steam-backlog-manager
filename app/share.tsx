@@ -115,7 +115,7 @@ function formatCents(cents: number, currency: string): string {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function ShareProfileScreen() {
-    const { themeColors, isPremium } = useAppContext();
+    const { themeColors } = useAppContext();
     const { language = 'en', playerName = 'Player' } = useAppContext() as any;
     const lang = language as Language;
     const { games, stats, loading, refresh } = useGames();
@@ -207,12 +207,6 @@ export default function ShareProfileScreen() {
                                 <Text style={[styles.playerName, { color: themeColors.textPrimary }]}>
                                     {playerName}
                                 </Text>
-                                {isPremium && (
-                                    <View style={[styles.proBadge, { backgroundColor: themeColors.accent }]}>
-                                        <Ionicons name="star" size={9} color="#fff" />
-                                        <Text style={styles.proText}>BacklogFlow Premium</Text>
-                                    </View>
-                                )}
                             </View>
                         </View>
 

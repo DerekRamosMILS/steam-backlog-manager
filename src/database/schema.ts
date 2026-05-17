@@ -41,23 +41,12 @@ export function initializeDatabase(): void {
   // Ensure the new 'platform' column exists in games table
   ensureColumn(db, 'games', 'platform', `TEXT NOT NULL DEFAULT 'steam'`);
 
-  // ── Cloud sync columns (added non-destructively) ────────────────────────
-  // updated_at: ISO-8601 timestamp touched on every local write.
-  //             Used for last-write-wins conflict resolution.
+  // updated_at: ISO-8601 timestamp touched on every local write. Useful for sorting/display.
   // SQLite ALTER TABLE ADD COLUMN only allows constant defaults (no function calls).
-  // Queries always set updated_at explicitly, so '' is a safe placeholder for existing rows.
   ensureColumn(db, 'games', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
-  // synced: 0 = dirty (needs push to Supabase), 1 = in sync.
-  ensureColumn(db, 'games', 'synced', `INTEGER NOT NULL DEFAULT 0`);
-  // remote_id: UUID assigned by Supabase after the first successful push.
-  ensureColumn(db, 'games', 'remote_id', `TEXT`);
-  // deleted_at: soft delete — NULL means active, set to ISO timestamp when user deletes.
-  ensureColumn(db, 'games', 'deleted_at', `TEXT`);
-  // device_id: UUID of the device that last modified this row (for conflict debugging).
-  ensureColumn(db, 'games', 'device_id', `TEXT`);
-  // external_id: platform-specific game ID (GOG product ID, Epic catalog ID, or Steam appid as text).
+  // external_id: platform-specific game ID (GOG product ID or Steam appid as text).
   ensureColumn(db, 'games', 'external_id', `TEXT`);
-  // id_source: which platform's ID system external_id refers to ('steam', 'gog', 'epic').
+  // id_source: which platform's ID system external_id refers to ('steam', 'gog', 'manual').
   ensureColumn(db, 'games', 'id_source', `TEXT DEFAULT 'steam'`);
 
   // Composite unique index for multi-platform dedup

@@ -38,10 +38,9 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
   const lang = language ?? 'en';
   const styles = getStyles(themeColors);
 
-  const [connections, setConnections] = useState<Record<ImportPlatform, PlatformConnection>>({
+  const [connections, setConnections] = useState<Partial<Record<ImportPlatform, PlatformConnection>>>({
     steam: { platform: 'steam', connected: false, lastSynced: null },
     gog: { platform: 'gog', connected: false, lastSynced: null },
-    epic: { platform: 'epic', connected: false, lastSynced: null },
   });
 
   const [loginModalVisible, setLoginModalVisible] = useState(false);
@@ -66,12 +65,6 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
         lastSynced: null,
         gameCount: getGameCountByPlatform('gog'),
       },
-      epic: {
-        platform: 'epic',
-        connected: false,
-        lastSynced: null,
-        gameCount: getGameCountByPlatform('epic'),
-      },
     });
   }, []);
 
@@ -86,7 +79,7 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
     onImportComplete?.();
   };
 
-  const platforms: ImportPlatform[] = ['steam', 'gog', 'epic'];
+  const platforms: ImportPlatform[] = ['steam', 'gog'];
 
   return (
     <View>
@@ -98,7 +91,7 @@ export function LibraryManager({ onImportComplete }: LibraryManagerProps) {
       <GlassCard padding={0}>
         {platforms.map((platform, index) => {
           const config = PLATFORM_CONFIG[platform];
-          const conn = connections[platform];
+          const conn = connections[platform] ?? { platform, connected: false, lastSynced: null };
           const isImporting = importing === platform;
           const result = importResult?.platform === platform ? importResult : null;
           const isSteam = platform === 'steam';

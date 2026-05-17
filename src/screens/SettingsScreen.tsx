@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   StatusBar,
   Linking,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,12 +29,9 @@ import { TutorialOverlay } from '../components/TutorialOverlay';
 import { useAppContext } from '../hooks/useAppContext';
 import { Theme } from '../types';
 import { t, Language } from '../i18n';
-import AuthScreen from '../screens/AuthScreen';
 
 export default function SettingsScreen() {
-  const { theme, themeColors, setTheme, isPremium, purchasePremium, restorePremium, showCustomerCenter, subscriptionLoading, isAuthenticated, user, signOut } = useAppContext();
-  const { language = 'en', setLanguage } = useAppContext() as unknown as { language: Language, setLanguage: (l: Language) => void };
-  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const { theme, themeColors, setTheme, language = 'en', setLanguage } = useAppContext() as any;
   const [showTutorial, setShowTutorial] = useState(false);
   const [steamId, setSteamId] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -177,9 +173,7 @@ export default function SettingsScreen() {
             try {
               deleteAllLocalData();
               Alert.alert(t('set_delete_all', language), t('set_delete_all_done', language));
-              // Trigger full re-mount by resetting onboarding flag (handled by RootLayout)
               setSetting('onboarding_completed', 'false');
-              setSetting('auth_prompted', 'false');
             } catch (e) {
               Alert.alert(t('sync_err_generic', language), t('sync_err_erase', language));
             }
@@ -188,6 +182,8 @@ export default function SettingsScreen() {
       ]
     );
   };
+
+  // auth_prompted setting removed — app no longer uses auth
 
   const handleCurrencyChange = (newCurrency: 'usd' | 'mxn') => {
     if (newCurrency === currency) return;
@@ -260,113 +256,8 @@ export default function SettingsScreen() {
           <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>{t('set_subtitle', language)}</Text>
         </View>
 
-        {/* Account */}
-        <View style={styles.section}>
-          <SectionHeader title={t('set_account', language)} icon="person-circle-outline" iconColor={themeColors.teal} />
-          <GlassCard padding={16}>
-            {isAuthenticated ? (
-              <View style={styles.accountRow}>
-                <View style={[styles.accountAvatar, { backgroundColor: themeColors.teal + '22' }]}>
-                  <Ionicons name="person" size={20} color={themeColors.teal} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.accountEmail, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                    {user?.email ?? ''}
-                  </Text>
-                  <Text style={[styles.accountSub, { color: themeColors.teal }]}>
-                    {t('set_account_signed_in_as', language)}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() =>
-                    Alert.alert(
-                      t('set_account_sign_out_confirm', language),
-                      t('set_account_sign_out_msg', language),
-                      [
-                        { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
-                        { text: t('set_account_sign_out', language), style: 'destructive', onPress: signOut },
-                      ]
-                    )
-                  }
-                  style={[styles.signOutBtn, { borderColor: themeColors.red + '55', backgroundColor: themeColors.red + '11' }]}
-                >
-                  <Text style={[styles.signOutText, { color: themeColors.red }]}>{t('set_account_sign_out', language)}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <Text style={[styles.helpText, { marginBottom: 12 }]}>{t('set_account_sign_in_desc', language)}</Text>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { borderColor: themeColors.teal + '44', backgroundColor: themeColors.teal + '16' }]}
-                  onPress={() => setAuthModalVisible(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="person-add-outline" size={16} color={themeColors.teal} />
-                  <Text style={[styles.actionBtnText, { color: themeColors.teal }]}>{t('set_account_sign_in_btn', language)}</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </GlassCard>
-        </View>
-
-        {/* Auth Modal */}
-        <Modal visible={authModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAuthModalVisible(false)}>
-          <AuthScreen onSuccess={() => setAuthModalVisible(false)} onSkip={() => setAuthModalVisible(false)} />
-        </Modal>
-
-        {/* Premium Lock */}
-        {!isPremium && (
-          <View style={styles.section}>
-            <GlassCard padding={20} intensity={30} borderColor={themeColors.accent} style={{ overflow: 'hidden' }}>
-              <LinearGradient colors={[`${themeColors.accent}33`, 'transparent']} style={StyleSheet.absoluteFill} />
-              <View style={styles.premiumHeader}>
-                <Ionicons name="star" size={24} color={themeColors.accent} />
-                <Text style={[styles.premiumTitle, { color: themeColors.textPrimary }]}>{t('set_premium_title', language)}</Text>
-              </View>
-              <Text style={[styles.premiumDesc, { color: themeColors.textSecondary }]}>
-                {t('set_premium_desc', language)}
-              </Text>
-              <TouchableOpacity style={[styles.unlockBtn, { backgroundColor: themeColors.accent }]} onPress={purchasePremium} disabled={subscriptionLoading}>
-                {subscriptionLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.unlockBtnText}>{t('ai_subscribe', language)}</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.restoreBtn]} onPress={restorePremium} disabled={subscriptionLoading}>
-                <Text style={[styles.restoreBtnText, { color: themeColors.textMuted }]}>{t('set_restore', language)}</Text>
-              </TouchableOpacity>
-            </GlassCard>
-          </View>
-        )}
-
-        {/* Manage Subscription (premium users) */}
-        {isPremium && (
-          <View style={styles.section}>
-            <GlassCard padding={16} intensity={20} borderColor={themeColors.accent + '44'}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <Ionicons name="star" size={18} color={themeColors.accent} />
-                <Text style={[styles.fieldLabel, { color: themeColors.accent, fontSize: 15 }]}>
-                  {language === 'es' ? 'BacklogFlow Premium Activo' : 'BacklogFlow Premium Active'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.actionBtn, { borderColor: themeColors.accent + '44', backgroundColor: themeColors.accent + '16' }]}
-                onPress={showCustomerCenter}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="settings-outline" size={16} color={themeColors.accent} />
-                <Text style={[styles.actionBtnText, { color: themeColors.accent }]}>
-                  {language === 'es' ? 'Gestionar Suscripción' : 'Manage Subscription'}
-                </Text>
-              </TouchableOpacity>
-            </GlassCard>
-          </View>
-        )}
-
         {/* Theme Settings */}
-        {isPremium && (
-          <View style={styles.section}>
+        <View style={styles.section}>
             <SectionHeader title={t('set_app_theme', language)} icon="color-palette" iconColor={themeColors.violet} />
             <GlassCard padding={16}>
               <View style={styles.themeGrid}>
@@ -391,7 +282,6 @@ export default function SettingsScreen() {
               </View>
             </GlassCard>
           </View>
-        )}
 
         {/* Language */}
         <View style={styles.section}>
@@ -423,33 +313,31 @@ export default function SettingsScreen() {
           </GlassCard>
         </View>
 
-        {/* Cloud Sync */}
-        {isPremium && (
-          <View style={styles.section}>
-            <SectionHeader title={t('set_cloud_sync', language)} icon="cloud-done-outline" iconColor={themeColors.teal} />
-            <GlassCard padding={16}>
-              <Text style={styles.helpText}>
-                {t('set_cloud_desc', language)}
-              </Text>
-              <View style={{ gap: 10 }}>
-                <ActionButton
-                  label={t('set_export_backup', language)}
-                  icon="arrow-down-circle-outline"
-                  color={themeColors.blue}
-                  loading={false}
-                  onPress={handleExportBackup}
-                />
-                <ActionButton
-                  label={t('set_import_backup', language)}
-                  icon="arrow-up-circle-outline"
-                  color={themeColors.teal}
-                  loading={false}
-                  onPress={handleImportBackup}
-                />
-              </View>
-            </GlassCard>
-          </View>
-        )}
+        {/* Backup de datos */}
+        <View style={styles.section}>
+          <SectionHeader title={t('settings_backup_title', language)} icon="save-outline" iconColor={themeColors.teal} />
+          <GlassCard padding={16}>
+            <Text style={[styles.helpText, { marginBottom: 12 }]}>
+              {t('settings_backup_hint', language)}
+            </Text>
+            <View style={{ gap: 10 }}>
+              <ActionButton
+                label={t('settings_export_btn', language)}
+                icon="arrow-down-circle-outline"
+                color={themeColors.blue}
+                loading={false}
+                onPress={handleExportBackup}
+              />
+              <ActionButton
+                label={t('settings_import_btn', language)}
+                icon="arrow-up-circle-outline"
+                color={themeColors.teal}
+                loading={false}
+                onPress={handleImportBackup}
+              />
+            </View>
+          </GlassCard>
+        </View>
 
         {/* Game Libraries (GOG, Epic, Steam status) */}
         <View style={styles.section}>
@@ -700,43 +588,14 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Subscription & Legal */}
+        {/* Legal */}
         <View style={styles.section}>
           <SectionHeader
-            title={language === 'es' ? 'Suscripción y Legal' : 'Subscription & Legal'}
+            title={language === 'es' ? 'Legal' : 'Legal'}
             icon="document-text-outline"
             iconColor={themeColors.teal}
           />
           <GlassCard padding={16}>
-            {/* Restore purchases — always visible so users can reclaim access */}
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: themeColors.teal + '44', backgroundColor: themeColors.teal + '16', marginBottom: 10 }]}
-              onPress={async () => {
-                const result = await restorePremium();
-                if (result.success) {
-                  Alert.alert(
-                    language === 'es' ? 'Compras restauradas' : 'Purchases restored',
-                    language === 'es' ? 'Tu acceso Premium ha sido restaurado.' : 'Your Premium access has been restored.',
-                  );
-                } else {
-                  Alert.alert(
-                    language === 'es' ? 'Sin compras' : 'Nothing to restore',
-                    result.error ?? (language === 'es' ? 'No se encontró suscripción activa.' : 'No active subscription found.'),
-                  );
-                }
-              }}
-              disabled={subscriptionLoading}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="refresh-circle-outline" size={16} color={themeColors.teal} />
-              <Text style={[styles.actionBtnText, { color: themeColors.teal }]}>
-                {subscriptionLoading
-                  ? (language === 'es' ? 'Restaurando…' : 'Restoring…')
-                  : (language === 'es' ? 'Restaurar compras' : 'Restore purchases')}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Legal links */}
             {[
               {
                 label: language === 'es' ? 'Política de Privacidad' : 'Privacy Policy',
@@ -747,11 +606,6 @@ export default function SettingsScreen() {
                 label: language === 'es' ? 'Términos de Servicio' : 'Terms of Service',
                 icon: 'document-text-outline' as const,
                 url: 'https://backlogflow.app/terms',
-              },
-              {
-                label: language === 'es' ? 'Términos de Suscripción' : 'Subscription Terms',
-                icon: 'card-outline' as const,
-                url: 'https://backlogflow.app/subscription-terms',
               },
             ].map(({ label, icon, url }) => (
               <TouchableOpacity
@@ -765,12 +619,6 @@ export default function SettingsScreen() {
                 <Ionicons name="chevron-forward" size={13} color={themeColors.textMuted} />
               </TouchableOpacity>
             ))}
-
-            <Text style={[styles.helpText, { marginTop: 12, fontSize: 11, lineHeight: 17 }]}>
-              {language === 'es'
-                ? 'Las suscripciones se renuevan automáticamente salvo que se cancelen 24h antes del período de renovación. Gestiona tu suscripción en los ajustes de tu dispositivo.'
-                : 'Subscriptions auto-renew unless cancelled 24 h before the renewal date. Manage your subscription in your device settings.'}
-            </Text>
           </GlassCard>
         </View>
 
@@ -966,11 +814,6 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { fontSize: 14, fontWeight: '700' },
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  accountAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  accountEmail: { fontSize: 14, fontWeight: '600' },
-  accountSub: { fontSize: 12, marginTop: 1 },
-  signOutBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  signOutText: { fontSize: 13, fontWeight: '600' },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

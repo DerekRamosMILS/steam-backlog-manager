@@ -7,7 +7,6 @@ import {
     Switch,
     ActivityIndicator,
     TouchableOpacity,
-    Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,15 +38,7 @@ import {
     recordVersusChoice,
     isAiProfileInitialized,
 } from '../../src/services/recommendationService';
-import {
-    isDailyAiLimitReached,
-    incrementDailyAiPicks,
-    getDailyAiPicksUsed,
-    AI_DAILY_LIMIT,
-} from '../../src/hooks/useLimits';
-import { usePremium } from '../../src/hooks/usePremium';
 import { trackEvent } from '../../src/services/analyticsService';
-import PaywallScreen from '../../src/screens/PaywallScreen';
 
 import { Language } from '../../src/i18n';
 
@@ -82,9 +73,8 @@ function getGoalOptions(lang: Language): { label: string; value: RecommendationG
 
 export default function RecommendationsScreen() {
     const router = useRouter();
-    const { themeColors, isPremium } = useAppContext();
+    const { themeColors } = useAppContext();
     const { language = 'en' } = useAppContext() as any;
-    const { purchaseProduct } = usePremium();
     const MOOD_OPTIONS = getMoodOptions(language as Language);
     const SESSION_OPTIONS = getSessionOptions(language as Language);
     const GOAL_OPTIONS = getGoalOptions(language as Language);
@@ -104,22 +94,14 @@ export default function RecommendationsScreen() {
     const [versusMsg, setVersusMsg] = useState('');
     const versusShownIds = React.useRef<number[]>([]);
     const [profileInitialized, setProfileInitialized] = useState(false);
-    // Daily limit: re-read on every render so it reflects midnight resets.
-    const dailyUsed = getDailyAiPicksUsed();
-    const limitReached = !isPremium && isDailyAiLimitReached();
-    const [paywallVisible, setPaywallVisible] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
             loadData();
-        }, [isPremium])
+        }, [])
     );
 
     const loadData = () => {
-        if (limitReached) {
-            setPaywallVisible(true);
-            return;
-        }
         setLoading(true);
         setVersusSelected(null);
         setVersusMsg('');
@@ -131,25 +113,20 @@ export default function RecommendationsScreen() {
                 availableTimeHours: sessionHours,
                 mood,
                 goal,
-                limit: isPremium ? 6 : AI_DAILY_LIMIT,
+                limit: 6,
             })
         );
         setDailyPick(getDailyPick());
-        if (isPremium) {
-            setMissions(getBacklogMissions());
-            setCollections(getSmartCollections());
-            setTasteProfile(getTasteProfile());
-            setWeeklyPlan(getWeeklyPlan(sessionHours ? sessionHours * 4 : 7));
-            const firstPair = getVersusPair([]);
-            if (firstPair) {
-                versusShownIds.current = [firstPair.left.game.id, firstPair.right.game.id];
-            }
-            setVersus(firstPair);
+        setMissions(getBacklogMissions());
+        setCollections(getSmartCollections());
+        setTasteProfile(getTasteProfile());
+        setWeeklyPlan(getWeeklyPlan(sessionHours ? sessionHours * 4 : 7));
+        const firstPair = getVersusPair([]);
+        if (firstPair) {
+            versusShownIds.current = [firstPair.left.game.id, firstPair.right.game.id];
         }
-        if (!isPremium) {
-            incrementDailyAiPicks();
-            trackEvent('ai_pick_used');
-        }
+        setVersus(firstPair);
+        trackEvent('ai_pick_used');
         setLoading(false);
     };
 
@@ -168,8 +145,6 @@ export default function RecommendationsScreen() {
         }, 1200);
     };
 
-    const previewRecs = isPremium ? recs : recs.slice(0, AI_DAILY_LIMIT);
-
     return (
         <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
             <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
@@ -179,9 +154,7 @@ export default function RecommendationsScreen() {
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('ai_title', language as Language)}</Text>
                     <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
-                        {isPremium
-                            ? t('ai_subtitle_premium', language as Language)
-                            : t('ai_subtitle_free', language as Language)}
+                        {t('ai_subtitle_premium', language as Language)}
                     </Text>
                 </View>
 
@@ -290,39 +263,17 @@ export default function RecommendationsScreen() {
                     </GlassCard>
                 </View>
 
-                {limitReached ? (
-                    <TouchableOpacity
-                        style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
-                        onPress={() => setPaywallVisible(true)}
-                        activeOpacity={0.85}
-                    >
-                        <Ionicons name="lock-closed" size={16} color="#fff" />
-                        <Text style={styles.applyBtnText}>{t('ai_paywall_title', language as Language)}</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
-                        onPress={loadData}
-                        activeOpacity={0.85}
-                    >
-                        <Ionicons name="sparkles" size={16} color="#fff" />
-                        <Text style={styles.applyBtnText}>
-                            {t('ai_get_picks', language as Language)}
-                            {!isPremium ? `  (${AI_DAILY_LIMIT - dailyUsed} left)` : ''}
-                        </Text>
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                    style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
+                    onPress={loadData}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="sparkles" size={16} color="#fff" />
+                    <Text style={styles.applyBtnText}>{t('ai_get_picks', language as Language)}</Text>
+                </TouchableOpacity>
 
-                {/* Paywall modal — full branded screen */}
-                <Modal visible={paywallVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaywallVisible(false)}>
-                    <PaywallScreen
-                        onClose={() => setPaywallVisible(false)}
-                        triggerMessage={`You've used your ${AI_DAILY_LIMIT} free AI picks for today. Come back tomorrow or go Premium for unlimited picks.`}
-                    />
-                </Modal>
-
-                {/* Premium: Daily Pick */}
-                {isPremium && dailyPick && (
+                {/* Daily Pick */}
+                {dailyPick && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_daily_pick', language as Language)} icon="flash" iconColor={themeColors.teal} />
                         <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
@@ -359,18 +310,18 @@ export default function RecommendationsScreen() {
 
                 {/* Top Picks */}
                 <View style={styles.section}>
-                    <SectionHeader title={isPremium ? t('ai_top_picks', language as Language) : t('ai_free_picks', language as Language)} icon="sparkles" iconColor={themeColors.orange} />
+                    <SectionHeader title={t('ai_top_picks', language as Language)} icon="sparkles" iconColor={themeColors.orange} />
 
                     {loading ? (
                         <ActivityIndicator size="large" color={themeColors.orange} style={{ marginTop: 40 }} />
-                    ) : previewRecs.length === 0 ? (
+                    ) : recs.length === 0 ? (
                         <GlassCard padding={20}>
                             <Text style={{ color: themeColors.textMuted, textAlign: 'center' }}>
                                 {t('ai_no_games', language as Language)}
                             </Text>
                         </GlassCard>
                     ) : (
-                        previewRecs.map((rec) => (
+                        recs.map((rec) => (
                             <View key={rec.game.id} style={styles.recWrapper}>
                                 <View style={[styles.reasonCard, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
                                     <Ionicons name="sparkles" size={14} color={themeColors.violet} />
@@ -411,49 +362,8 @@ export default function RecommendationsScreen() {
                     )}
                 </View>
 
-                {/* Paywall card for free users */}
-                {!isPremium && (
-                    <View style={styles.section}>
-                        <GlassCard padding={24} borderColor={themeColors.accent} style={{ overflow: 'hidden' }}>
-                            <LinearGradient
-                                colors={[themeColors.accent + '22', 'transparent']}
-                                style={StyleSheet.absoluteFill}
-                            />
-                            <View style={styles.paywallHeader}>
-                                <Ionicons name="star" size={28} color={themeColors.accent} />
-                                <Text style={[styles.paywallTitle, { color: themeColors.textPrimary }]}>
-                                    {t('ai_paywall_title', language as Language)}
-                                </Text>
-                            </View>
-                            <Text style={[styles.paywallSubtitle, { color: themeColors.textSecondary }]}>
-                                {t('ai_paywall_subtitle', language as Language)}
-                            </Text>
-                            {[
-                                t('ai_benefit_unlimited', language as Language),
-                                t('ai_benefit_profile', language as Language),
-                                t('ai_benefit_versus', language as Language),
-                                t('ai_benefit_collections', language as Language),
-                                t('ai_benefit_plan', language as Language),
-                                t('ai_benefit_daily', language as Language),
-                            ].map((benefit) => (
-                                <View key={benefit} style={styles.benefitRow}>
-                                    <Ionicons name="checkmark-circle" size={16} color={themeColors.accent} />
-                                    <Text style={[styles.benefitText, { color: themeColors.textSecondary }]}>{benefit}</Text>
-                                </View>
-                            ))}
-                            <TouchableOpacity
-                                style={[styles.paywallBtn, { backgroundColor: themeColors.accent }]}
-                                onPress={() => setPaywallVisible(true)}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={styles.paywallBtnText}>{t('ai_subscribe', language as Language)}</Text>
-                            </TouchableOpacity>
-                        </GlassCard>
-                    </View>
-                )}
-
-                {/* Premium: Taste Profile */}
-                {isPremium && tasteProfile && profileInitialized && (
+                {/* Taste Profile */}
+                {tasteProfile && profileInitialized && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
                         <GlassCard padding={18}>
@@ -470,7 +380,7 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {isPremium && tasteProfile && !profileInitialized && (
+                {tasteProfile && !profileInitialized && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
                         <GlassCard padding={18}>
@@ -487,8 +397,8 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {/* Premium: Versus Picker */}
-                {isPremium && versus && (
+                {/* Versus Picker */}
+                {versus && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_versus', language as Language)} icon="git-compare" iconColor={themeColors.accent} />
                         <GlassCard padding={18}>
@@ -535,8 +445,8 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {/* Premium: Smart Collections */}
-                {isPremium && collections.length > 0 && (
+                {/* Smart Collections */}
+                {collections.length > 0 && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_smart_collections', language as Language)} icon="albums" iconColor={themeColors.blue} />
                         {collections.map((collection) => (
@@ -558,8 +468,8 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {/* Premium: Weekly Plan */}
-                {isPremium && weeklyPlan && weeklyPlan.items.length > 0 && (
+                {/* Weekly Plan */}
+                {weeklyPlan && weeklyPlan.items.length > 0 && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_weekly_plan', language as Language)} icon="calendar" iconColor={themeColors.violet} />
                         <GlassCard padding={18}>
@@ -581,8 +491,8 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {/* Premium: Backlog Missions */}
-                {isPremium && missions.length > 0 && (
+                {/* Backlog Missions */}
+                {missions.length > 0 && (
                     <View style={styles.section}>
                         <SectionHeader title={t('ai_missions', language as Language)} icon="flag" iconColor={themeColors.green} />
                         {missions.map((mission) => (

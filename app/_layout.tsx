@@ -6,9 +6,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { useDatabase } from '../src/hooks/useDatabase';
 import { AppProvider } from '../src/hooks/useAppContext';
-import { getSetting, setSetting } from '../src/database/queries';
+import { getSetting } from '../src/database/queries';
 import OnboardingScreen from '../src/screens/OnboardingScreen';
-import AuthScreen from '../src/screens/AuthScreen';
 import { t, Language } from '../src/i18n';
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
@@ -23,7 +22,6 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorState>
   }
 
   componentDidCatch(error: Error) {
-    // Log to console — integrate Sentry here when ready
     console.error('[ErrorBoundary]', error);
   }
 
@@ -73,19 +71,16 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const { ready } = useDatabase();
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-  const [authPrompted, setAuthPrompted] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (ready) {
       const done = getSetting('onboarding_completed') === 'true';
-      const prompted = getSetting('auth_prompted') === 'true';
       setOnboardingDone(done);
-      setAuthPrompted(prompted);
       SplashScreen.hideAsync();
     }
   }, [ready]);
 
-  if (!ready || onboardingDone === null || authPrompted === null) {
+  if (!ready || onboardingDone === null) {
     return null;
   }
 
@@ -95,21 +90,6 @@ export default function RootLayout() {
         <AppProvider>
           <StatusBar style="light" />
           <OnboardingScreen onComplete={() => setOnboardingDone(true)} />
-        </AppProvider>
-      </ErrorBoundary>
-    );
-  }
-
-  if (!authPrompted) {
-    const markDone = () => {
-      setSetting('auth_prompted', 'true');
-      setAuthPrompted(true);
-    };
-    return (
-      <ErrorBoundary>
-        <AppProvider>
-          <StatusBar style="light" />
-          <AuthScreen onSuccess={markDone} onSkip={markDone} />
         </AppProvider>
       </ErrorBoundary>
     );

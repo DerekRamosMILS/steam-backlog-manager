@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,10 +19,8 @@ import { GlassCard } from '../components/GlassCard';
 import { GameCover } from '../components/GameCover';
 import { useAppContext } from '../hooks/useAppContext';
 import { t, Language, StringKey } from '../i18n';
-import { isMonthlyPaLimitReached, incrementMonthlyPa, getMonthlyPaUsed, PA_MONTHLY_LIMIT } from '../hooks/useLimits';
 import { trackEvent } from '../services/analyticsService';
-import PaywallScreen from './PaywallScreen';
-import { searchGamesByTitle } from '../services/igdbService';
+import { searchGamesByTitle } from '../services/gameSearchService';
 import { searchHLTB } from '../api/hltb';
 import { getBacklogStats, getAllGames } from '../database/queries';
 import { ManualGameSearchResult, Game } from '../types';
@@ -114,12 +111,9 @@ const VERDICT_THEME: Record<VerdictLevel, {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PurchaseAdvisorScreen() {
-  const { themeColors, language, isPremium } = useAppContext();
-  const { playerName = 'Player' } = useAppContext() as unknown as { playerName: string };
+  const { themeColors, language, playerName = 'Player' } = useAppContext() as any;
   const router = useRouter();
   const verdictRef = useRef<ViewShot>(null);
-
-  const [paywallVisible, setPaywallVisible] = useState(false);
   const [step, setStep] = useState<Step>('search');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ManualGameSearchResult[]>([]);
@@ -162,9 +156,7 @@ export default function PurchaseAdvisorScreen() {
 
   const handleAnalyze = async () => {
     if (!selectedGame || !motivation || !timing) return;
-    if (!isPremium && isMonthlyPaLimitReached()) {
-      setPaywallVisible(true);
-      return;
+    {
     }
     setStep('analyzing');
     await new Promise((r) => setTimeout(r, 1400));
@@ -189,10 +181,7 @@ export default function PurchaseAdvisorScreen() {
       playerName: playerName as string,
     });
     setStep('verdict');
-    if (!isPremium) {
-      incrementMonthlyPa();
-    }
-    trackEvent('purchase_advisor_used', { remaining: String(PA_MONTHLY_LIMIT - getMonthlyPaUsed()) });
+    trackEvent('purchase_advisor_used', {});
   };
 
   const handleShare = async () => {
@@ -460,13 +449,6 @@ export default function PurchaseAdvisorScreen() {
         </ScrollView>
       )}
 
-      {/* Paywall — triggered when monthly PA limit is reached */}
-      <Modal visible={paywallVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaywallVisible(false)}>
-        <PaywallScreen
-          onClose={() => setPaywallVisible(false)}
-          triggerMessage={`You've used your ${PA_MONTHLY_LIMIT} free Purchase Advisor check this month. Upgrade to Premium for unlimited access.`}
-        />
-      </Modal>
     </View>
   );
 }

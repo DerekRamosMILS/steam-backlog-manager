@@ -33,7 +33,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { games, stats, refresh, setStatus, getByStatus } = useGames();
   const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
-  const { themeColors, isPremium, language, playerName } = useAppContext();
+  const { themeColors, language, playerName } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [timerGame, setTimerGame] = useState<Game | null>(null);
@@ -47,10 +47,8 @@ export default function DashboardScreen() {
       refreshRec();
       setDailyPick(getDailyPick());
       setCelebration(getRecentCompletionCelebration());
-      if (isPremium) {
-        setTopRecs(getRecommendations({ limit: 3 }));
-      }
-    }, [refresh, refreshRec, isPremium])
+      setTopRecs(getRecommendations({ limit: 3 }));
+    }, [refresh, refreshRec])
   );
 
   const onRefresh = async () => {
@@ -197,7 +195,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {isPremium && topRecs.length > 0 && (
+        {topRecs.length > 0 && (
           <View style={styles.section}>
             <SectionHeader title={t('dash_ai_next', language)} icon="sparkles" iconColor={themeColors.orange} />
             <TouchableOpacity onPress={() => router.push(`/game/${topRecs[0].game.id}`)} activeOpacity={0.8} style={{ position: 'relative', marginTop: 12 }}>

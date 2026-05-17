@@ -22,7 +22,7 @@ import { getAllSettings } from '../../src/database/queries';
 const DAILY_PLAY_SCENARIOS = [1, 2, 3];
 
 export default function StatsScreen() {
-  const { themeColors, isPremium, language } = useAppContext();
+  const { themeColors, language } = useAppContext();
   const { games, stats, refresh } = useGames();
 
   useFocusEffect(

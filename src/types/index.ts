@@ -325,7 +325,7 @@ export interface ManualGameDraft {
   developerName: string | null;
   publisherName: string | null;
   externalId: string | null;
-  idSource: 'manual' | 'igdb';
+  idSource: 'manual' | 'igdb' | 'steam';
 }
 
 export interface ManualGameSearchResult {

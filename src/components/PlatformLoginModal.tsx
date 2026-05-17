@@ -43,7 +43,7 @@ export function PlatformLoginModal({
   const config = PLATFORM_CONFIG[platform];
   if (!config) return null;
 
-  const isPlatformWithNoApi = platform === 'gog' || platform === 'epic';
+  const isPlatformWithNoApi = platform === 'gog';
 
   return (
     <Modal
@@ -101,10 +101,10 @@ export function PlatformLoginModal({
               <View style={[styles.infoBox, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
                 <Ionicons name="information-circle-outline" size={28} color={config.color} />
                 <Text style={[styles.infoTitle, { color: themeColors.textPrimary }]}>
-                  {platform === 'epic' ? t('plat_epic_no_api_title', lang) : t('plat_gog_no_api_title', lang)}
+                  {t('plat_gog_no_api_title', lang)}
                 </Text>
                 <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
-                  {platform === 'epic' ? t('plat_epic_no_api_body', lang) : t('plat_gog_no_api_body', lang)}
+                  {t('plat_gog_no_api_body', lang)}
                 </Text>
               </View>
 

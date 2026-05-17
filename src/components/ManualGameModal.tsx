@@ -13,9 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import NetInfo from '@react-native-community/netinfo';
 import { useAppContext } from '../hooks/useAppContext';
-import { searchGamesByTitle } from '../services/igdbService';
+import { searchGamesByTitle } from '../services/gameSearchService';
 import { insertManualGame } from '../database/queries';
 import { ManualGameSearchResult, GameStatus, GamePriority, Platform } from '../types';
 import { t, Language } from '../i18n';
@@ -63,24 +62,16 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
   const [searchResults, setSearchResults] = useState<ManualGameSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedGame, setSelectedGame] = useState<ManualGameSearchResult | null>(null);
-  const [isOnline, setIsOnline] = useState(true);
   const [saving, setSaving] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const STATUS_OPTIONS = getStatusOptions(language as Language);
   const PRIORITY_OPTIONS = getPriorityOptions(language as Language);
 
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      setIsOnline(!!state.isConnected);
-    });
-    return () => unsubscribe();
-  }, []);
-
   const handleTitleChange = (text: string) => {
     setTitle(text);
     setSelectedGame(null);
-    if (!isOnline || text.trim().length < 2) {
+    if (text.trim().length < 2) {
       setSearchResults([]);
       return;
     }
@@ -129,7 +120,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
         developerName: selectedGame?.developer ?? null,
         publisherName: null,
         externalId: selectedGame ? String(selectedGame.igdbId) : null,
-        idSource: selectedGame ? 'igdb' : 'manual',
+        idSource: selectedGame ? 'steam' : 'manual',
       });
       onGameAdded();
       reset();
@@ -162,25 +153,6 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Online notice */}
-          {!isOnline && (
-            <View style={[styles.offlineBanner, { backgroundColor: themeColors.orange + '22', borderColor: themeColors.orange + '55' }]}>
-              <Ionicons name="cloud-offline-outline" size={16} color={themeColors.orange} />
-              <Text style={[styles.offlineText, { color: themeColors.orange }]}>
-                {t('mgm_offline_msg', language as Language)}
-              </Text>
-            </View>
-          )}
-
-          {isOnline && (
-            <View style={[styles.onlineBanner, { backgroundColor: themeColors.teal + '18', borderColor: themeColors.teal + '44' }]}>
-              <Ionicons name="search-outline" size={14} color={themeColors.teal} />
-              <Text style={[styles.onlineText, { color: themeColors.teal }]}>
-                {t('mgm_online_msg', language as Language)}
-              </Text>
-            </View>
-          )}
-
           {/* Title */}
           <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('mgm_title_label', language as Language)}</Text>
           <View style={[styles.inputWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
@@ -324,10 +296,6 @@ const styles = StyleSheet.create({
   saveBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10, minWidth: 60, alignItems: 'center' },
   saveText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   scroll: { padding: 16 },
-  offlineBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 16 },
-  offlineText: { fontSize: 12, lineHeight: 17, flex: 1 },
-  onlineBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 16 },
-  onlineText: { fontSize: 12, lineHeight: 17, flex: 1 },
   label: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
   inputWrap: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, height: 44, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   textAreaWrap: { height: 88, alignItems: 'flex-start', paddingTop: 10 },

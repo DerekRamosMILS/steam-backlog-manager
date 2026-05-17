@@ -85,6 +85,8 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Planner tab hidden — functionality merged into Pick + Insights */}
+      <Tabs.Screen name="planner" options={{ href: null }} />
     </Tabs>
   );
 }

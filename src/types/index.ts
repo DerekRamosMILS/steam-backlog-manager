@@ -303,12 +303,6 @@ export interface AiPreviewState {
   preferenceEventsCount: number;
 }
 
-export interface AiEntitlementState {
-  isPremium: boolean;
-  provider: 'local' | 'revenuecat';
-  expirationAt: string | null;
-  status: 'active' | 'expired' | 'unknown';
-}
 
 // ─── Manual Game Types ────────────────────────────────────────────────────────
 

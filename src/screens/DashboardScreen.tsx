@@ -336,11 +336,34 @@ export default function DashboardScreen() {
         {/* Empty state when no games at all */}
         {games.length === 0 && (
           <View style={styles.emptyFull}>
-            <Ionicons name="cloud-download-outline" size={52} color={ED.ink4} />
+            <View style={styles.emptyIconRing}>
+              <Ionicons name="library-outline" size={32} color={ED.copper} />
+            </View>
+            <Text style={[edStyles.eyebrow, { color: ED.copper, marginTop: 12 }]}>
+              ◆ READY WHEN YOU ARE
+            </Text>
             <Text style={styles.emptyFullTitle}>{t('dash_empty_title', language)}</Text>
-            <Text style={[edStyles.eyebrow, { color: ED.ink3, textAlign: 'center', marginTop: 4 }]}>
+            <Text style={styles.emptyFullSub}>
               {t('dash_empty_text', language)}
             </Text>
+
+            <TouchableOpacity
+              style={styles.emptyCta}
+              onPress={() => router.push('/(tabs)/settings' as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="cloud-download-outline" size={16} color="#1A1108" />
+              <Text style={styles.emptyCtaText}>Import library</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.emptyCtaGhost}
+              onPress={() => router.push('/(tabs)/library' as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-outline" size={15} color={ED.ink2} />
+              <Text style={styles.emptyCtaGhostText}>Add a game manually</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -429,6 +452,29 @@ const styles = StyleSheet.create({
   pausedTitle: { fontSize: 13, fontWeight: '600', letterSpacing: -0.2, color: ED.ink, marginTop: 8 },
 
   // Empty full
-  emptyFull: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyFullTitle: { fontSize: 18, fontWeight: '700', color: ED.ink },
+  emptyFull: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 12, gap: 10 },
+  emptyIconRing: {
+    width: 78, height: 78, borderRadius: 22,
+    backgroundColor: ED.copperBg, borderWidth: 1, borderColor: ED.copperLine,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyFullTitle: {
+    fontSize: 26, fontWeight: '800', color: ED.ink,
+    letterSpacing: -0.8, textAlign: 'center', marginTop: 2,
+  },
+  emptyFullSub: {
+    fontSize: 13, color: ED.ink3, textAlign: 'center',
+    lineHeight: 20, maxWidth: 280, marginTop: 2, marginBottom: 16,
+  },
+  emptyCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, height: 50, borderRadius: 14,
+    backgroundColor: ED.copper, paddingHorizontal: 24, minWidth: 240,
+  },
+  emptyCtaText: { fontSize: 15, fontWeight: '700', color: '#1A1108' },
+  emptyCtaGhost: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, height: 42, paddingHorizontal: 16,
+  },
+  emptyCtaGhostText: { fontSize: 13, fontWeight: '600', color: ED.ink2 },
 });

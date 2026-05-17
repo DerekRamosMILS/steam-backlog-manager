@@ -9,6 +9,7 @@ import { AppProvider } from '../src/hooks/useAppContext';
 import { getSetting } from '../src/database/queries';
 import OnboardingScreen from '../src/screens/OnboardingScreen';
 import { t, Language } from '../src/i18n';
+import { ED } from '../src/styles/editorial';
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 
@@ -47,23 +48,23 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorState>
 const ebStyles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0a0a14',
+    backgroundColor: ED.bg,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
     gap: 16,
   },
   icon: { fontSize: 52 },
-  title: { color: '#f0f0f0', fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  msg: { color: '#a0a0b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  title: { color: ED.ink, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  msg: { color: ED.ink3, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   btn: {
-    backgroundColor: '#6366f1',
+    backgroundColor: ED.copper,
     paddingHorizontal: 24,
     paddingVertical: 13,
     borderRadius: 12,
     marginTop: 8,
   },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnText: { color: '#1A1108', fontSize: 15, fontWeight: '700' },
 });
 
 SplashScreen.preventAutoHideAsync();
@@ -102,7 +103,7 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: '#0a0a14' },
+            contentStyle: { backgroundColor: ED.bg },
             animation: 'fade_from_bottom',
           }}
         >

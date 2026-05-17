@@ -112,6 +112,8 @@ export function initializeDatabase(): void {
   ensureColumn(db, 'games', 'cover_local_path', `TEXT`);
   ensureColumn(db, 'games', 'is_manual_entry', `INTEGER NOT NULL DEFAULT 0`);
   ensureColumn(db, 'games', 'price_cents', `INTEGER`);
+  // Soft-delete timestamp: when non-NULL, the row is treated as deleted.
+  ensureColumn(db, 'games', 'deleted_at', `TEXT`);
 
   // Indexes for common queries
   db.execSync(`

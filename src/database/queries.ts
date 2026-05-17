@@ -229,15 +229,15 @@ export function getBacklogStats(): BacklogStats {
   }>(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN status = 'playing'     THEN 1 ELSE 0 END) AS playing,
-      SUM(CASE WHEN status = 'up_next'     THEN 1 ELSE 0 END) AS up_next,
-      SUM(CASE WHEN status = 'paused'      THEN 1 ELSE 0 END) AS paused,
-      SUM(CASE WHEN status = 'completed'   THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN status = 'abandoned'   THEN 1 ELSE 0 END) AS abandoned,
-      SUM(CASE WHEN status = 'not_started' THEN 1 ELSE 0 END) AS not_started,
-      SUM(CASE WHEN exclude_from_backlog = 1 THEN 1 ELSE 0 END) AS excluded_from_backlog,
-      SUM(CASE WHEN hltb_main_story IS NOT NULL AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END) AS hltb_target_met,
-      SUM(CASE WHEN hltb_main_story IS NOT NULL AND status NOT IN ('completed', 'abandoned') AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END) AS hltb_ready_to_finish
+      COALESCE(SUM(CASE WHEN status = 'playing'     THEN 1 ELSE 0 END), 0) AS playing,
+      COALESCE(SUM(CASE WHEN status = 'up_next'     THEN 1 ELSE 0 END), 0) AS up_next,
+      COALESCE(SUM(CASE WHEN status = 'paused'      THEN 1 ELSE 0 END), 0) AS paused,
+      COALESCE(SUM(CASE WHEN status = 'completed'   THEN 1 ELSE 0 END), 0) AS completed,
+      COALESCE(SUM(CASE WHEN status = 'abandoned'   THEN 1 ELSE 0 END), 0) AS abandoned,
+      COALESCE(SUM(CASE WHEN status = 'not_started' THEN 1 ELSE 0 END), 0) AS not_started,
+      COALESCE(SUM(CASE WHEN exclude_from_backlog = 1 THEN 1 ELSE 0 END), 0) AS excluded_from_backlog,
+      COALESCE(SUM(CASE WHEN hltb_main_story IS NOT NULL AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END), 0) AS hltb_target_met,
+      COALESCE(SUM(CASE WHEN hltb_main_story IS NOT NULL AND status NOT IN ('completed', 'abandoned') AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END), 0) AS hltb_ready_to_finish
     FROM games
   `) ?? {
     total: 0, playing: 0, up_next: 0, paused: 0,

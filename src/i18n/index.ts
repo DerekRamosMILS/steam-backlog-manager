@@ -84,6 +84,24 @@ export const STRINGS = {
     en: 'Local only — nudges about stale games and unfinished challenges.',
     es: 'Solo locales — avisos de juegos estancados y retos sin cerrar.',
   },
+  // Add-game modal
+  mgm_header: { en: 'ADD GAME', es: 'AÑADIR JUEGO' },
+  mgm_display_title: { en: 'Track any title.', es: 'Registra cualquier título.' },
+  mgm_display_sub: {
+    en: 'Search Steam or enter details manually.',
+    es: 'Busca en Steam o escribe los datos a mano.',
+  },
+  mgm_results_from_steam: { en: 'results from Steam', es: 'resultados de Steam' },
+  mgm_or_manual: { en: 'OR ENTER MANUALLY', es: 'O ESCRÍBELO A MANO' },
+  mgm_add_to_library: { en: 'Add to library', es: 'Añadir a la biblioteca' },
+  st_not_started: { en: 'Not started', es: 'Sin empezar' },
+  st_up_next: { en: 'Up Next', es: 'En cola' },
+  st_playing: { en: 'Playing', es: 'Jugando' },
+  st_paused: { en: 'Paused', es: 'Pausado' },
+  pr_high: { en: 'High', es: 'Alta' },
+  pr_medium: { en: 'Med', es: 'Media' },
+  pr_low: { en: 'Low', es: 'Baja' },
+
   set_notifications_denied: {
     en: 'Notifications are blocked. Enable them for BacklogFlow in your system settings.',
     es: 'Las notificaciones están bloqueadas. Actívalas para BacklogFlow en los ajustes del sistema.',

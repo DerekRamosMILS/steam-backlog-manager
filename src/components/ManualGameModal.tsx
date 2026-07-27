@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../hooks/useAppContext';
-import { searchGamesByTitle } from '../services/gameSearchService';
+import { fetchGameMetadata, searchGamesByTitle } from '../services/gameSearchService';
 import { insertManualGame } from '../database/queries';
 import { ManualGameSearchResult, GameStatus, GamePriority, Platform as GamePlatform } from '../types';
-import { t, Language } from '../i18n';
+import { t, Language, StringKey } from '../i18n';
 import { ED, edStyles, MONO_FONT, STATUS_COLORS } from '../styles/editorial';
 
 interface Props {
@@ -25,17 +25,17 @@ interface Props {
   onGameAdded: () => void;
 }
 
-const STATUS_OPTIONS: { key: GameStatus; label: string }[] = [
-  { key: 'not_started', label: 'Not started' },
-  { key: 'up_next', label: 'Up Next' },
-  { key: 'playing', label: 'Playing' },
-  { key: 'paused', label: 'Paused' },
+const STATUS_OPTIONS: { key: GameStatus; labelKey: StringKey }[] = [
+  { key: 'not_started', labelKey: 'st_not_started' },
+  { key: 'up_next', labelKey: 'st_up_next' },
+  { key: 'playing', labelKey: 'st_playing' },
+  { key: 'paused', labelKey: 'st_paused' },
 ];
 
-const PRIORITY_OPTIONS: { key: GamePriority; label: string; color: string }[] = [
-  { key: 'high', label: 'High', color: ED.rust },
-  { key: 'medium', label: 'Med', color: ED.amber },
-  { key: 'low', label: 'Low', color: ED.ink3 },
+const PRIORITY_OPTIONS: { key: GamePriority; labelKey: StringKey; color: string }[] = [
+  { key: 'high', labelKey: 'pr_high', color: ED.rust },
+  { key: 'medium', labelKey: 'pr_medium', color: ED.amber },
+  { key: 'low', labelKey: 'pr_low', color: ED.ink3 },
 ];
 
 const PLATFORM_OPTIONS: { key: GamePlatform; label: string }[] = [
@@ -80,6 +80,14 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
     setSelectedGame(game);
     setTitle(game.title);
     setSearchResults([]);
+
+    // Steam's search endpoint omits year, summary and developer — pull them in the
+    // background so the saved entry keeps them. Failure just leaves the basics.
+    fetchGameMetadata(game.appId)
+      .then((full) => {
+        if (full) setSelectedGame((current) => (current?.appId === full.appId ? full : current));
+      })
+      .catch(() => {});
   };
 
   const reset = () => {
@@ -127,7 +135,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
           <TouchableOpacity onPress={() => { reset(); onClose(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="close" size={20} color={ED.ink3} />
           </TouchableOpacity>
-          <Text style={edStyles.eyebrow}>ADD GAME</Text>
+          <Text style={edStyles.eyebrow}>{t('mgm_header', lang)}</Text>
           <TouchableOpacity
             onPress={handleSave}
             disabled={saving}
@@ -148,8 +156,8 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
         >
           {/* Title */}
           <View style={s.titleBlock}>
-            <Text style={[edStyles.displayTitle, { fontSize: 30 }]}>Track any title.</Text>
-            <Text style={s.titleSub}>Search Steam or enter details manually.</Text>
+            <Text style={[edStyles.displayTitle, { fontSize: 30 }]}>{t('mgm_display_title', lang)}</Text>
+            <Text style={s.titleSub}>{t('mgm_display_sub', lang)}</Text>
           </View>
 
           {/* Search bar */}
@@ -170,7 +178,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
           {searchResults.length > 0 && (
             <View style={s.section}>
               <View style={edStyles.sectionHead}>
-                <Text style={edStyles.eyebrow}>{searchResults.length} results from Steam</Text>
+                <Text style={edStyles.eyebrow}>{searchResults.length} {t('mgm_results_from_steam', lang)}</Text>
               </View>
               <View style={edStyles.card}>
                 {searchResults.map((game, idx) => (
@@ -213,7 +221,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
           {/* Divider */}
           <View style={s.divider}>
             <View style={s.dividerLine} />
-            <Text style={edStyles.eyebrow}>OR ENTER MANUALLY</Text>
+            <Text style={edStyles.eyebrow}>{t('mgm_or_manual', lang)}</Text>
             <View style={s.dividerLine} />
           </View>
 
@@ -254,7 +262,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
                       onPress={() => setStatus(opt.key)}
                       activeOpacity={0.75}
                     >
-                      <Text style={[s.selectText, active && { color: sc.color }]}>{opt.label}</Text>
+                      <Text style={[s.selectText, active && { color: sc.color }]}>{t(opt.labelKey, lang)}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -272,7 +280,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
                       onPress={() => setPriority(opt.key)}
                       activeOpacity={0.75}
                     >
-                      <Text style={[s.selectText, active && { color: opt.color }]}>{opt.label}</Text>
+                      <Text style={[s.selectText, active && { color: opt.color }]}>{t(opt.labelKey, lang)}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -308,7 +316,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
             ) : (
               <>
                 <Ionicons name="add" size={16} color="#1A1108" />
-                <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>Add to library</Text>
+                <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>{t('mgm_add_to_library', lang)}</Text>
               </>
             )}
           </TouchableOpacity>

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { setSetting } from '../database/queries';
 import { t, Language } from '../i18n';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import { useAppContext } from '../hooks/useAppContext';
 import { ED, MONO_FONT } from '../styles/editorial';
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
 const TOTAL_STEPS = 7;
 
 export default function OnboardingScreen({ onComplete }: Props) {
+  const { setLanguage: applyLanguage, setPlayerName: applyPlayerName } = useAppContext();
   const [step, setStep] = useState(0);
   const [lang, setLang] = useState<Language>('en');
   const [playerName, setPlayerName] = useState('');
@@ -41,8 +43,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const handleComplete = () => {
     setSetting('onboarding_completed', 'true');
-    setSetting('player_name', playerName.trim() || 'Player');
-    setSetting('app_language', lang);
+    // Go through the context setters, not setSetting: RootLayout keeps the same
+    // AppProvider instance across the onboarding→app swap, so it never re-reads
+    // settings on its own and would stay on the defaults.
+    applyLanguage(lang);
+    applyPlayerName(playerName.trim() || 'Player');
     onComplete();
   };
 

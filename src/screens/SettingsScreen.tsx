@@ -81,23 +81,36 @@ export default function SettingsScreen() {
     });
     setImporting(false);
     setProgress(null);
-    deactivateKeepAwake();
     if (result.errors.length > 0) {
+      deactivateKeepAwake();
       setImportResult(`${t('sync_err_generic', language)}: ${result.errors[0]}`);
-    } else {
-      setImportResult(
-        `${t('sync_imported_games', language)} ${result.imported} ${t('lib_games', language)}.${result.skipped > 0 ? ` (${result.skipped} ${t('sync_skipped_games', language)})` : ''}`
-      );
+      return;
     }
+
+    setImportResult(
+      `${t('sync_imported_games', language)} ${result.imported} ${t('lib_games', language)}.${result.skipped > 0 ? ` (${result.skipped} ${t('sync_skipped_games', language)})` : ''}`
+    );
+
+    // Freshly imported games have no completion times yet — fetch them now instead of
+    // waiting for the user to discover the manual button.
+    if (result.imported > 0) {
+      await runHltbEnrichment();
+    }
+    deactivateKeepAwake();
   };
 
-  const handleEnrichHLTB = async () => {
+  const runHltbEnrichment = async () => {
     setEnriching(true);
     setHltbProgress(null);
-    await activateKeepAwakeAsync();
     const result = await batchEnrichHLTB((next) => setHltbProgress(next));
     setEnriching(false);
     setHltbProgress(null);
+    return result;
+  };
+
+  const handleEnrichHLTB = async () => {
+    await activateKeepAwakeAsync();
+    const result = await runHltbEnrichment();
     deactivateKeepAwake();
     Alert.alert(
       t('alert_hltb_done', language),

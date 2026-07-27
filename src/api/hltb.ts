@@ -153,7 +153,8 @@ async function runSearch(query: string): Promise<{
   };
 
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const token = await fetchAuthToken();
+    // Force a fresh token if the previous attempt was rejected as unauthorized.
+    const token = await getAuthToken(attempt > 1);
     if (!token) {
       return {
         status: 'request_failed',
@@ -183,6 +184,12 @@ async function runSearch(query: string): Promise<{
       };
     }
 
+    // A cached token can go stale server-side; drop it and retry once with a fresh one.
+    if ((res.status === 401 || res.status === 403) && attempt < 3) {
+      invalidateAuthToken();
+      continue;
+    }
+
     // HLTB occasionally throws transient 5xx errors mid-batch.
     if (res.status >= 500 && attempt < 3) {
       await delay(attempt * 1500);
@@ -199,6 +206,43 @@ async function runSearch(query: string): Promise<{
     status: 'request_failed',
     errorMessage: `HLTB POST ${HLTB_API_URL} failed after retries`,
   };
+}
+
+// One token serves every search. Re-requesting it per query (and per title variant)
+// meant a 200-game batch fired thousands of /init calls and got throttled.
+const TOKEN_TTL_MS = 10 * 60 * 1000;
+let cachedToken: string | null = null;
+let cachedTokenAt = 0;
+let inFlightToken: Promise<string | null> | null = null;
+
+function invalidateAuthToken(): void {
+  cachedToken = null;
+  cachedTokenAt = 0;
+}
+
+async function getAuthToken(forceRefresh = false): Promise<string | null> {
+  if (forceRefresh) invalidateAuthToken();
+
+  if (cachedToken && Date.now() - cachedTokenAt < TOKEN_TTL_MS) {
+    return cachedToken;
+  }
+
+  // Collapse the parallel batch into a single in-flight request.
+  if (!inFlightToken) {
+    inFlightToken = fetchAuthToken()
+      .then((token) => {
+        if (token) {
+          cachedToken = token;
+          cachedTokenAt = Date.now();
+        }
+        return token;
+      })
+      .finally(() => {
+        inFlightToken = null;
+      });
+  }
+
+  return inFlightToken;
 }
 
 async function fetchAuthToken(): Promise<string | null> {

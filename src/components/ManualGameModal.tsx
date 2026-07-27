@@ -106,7 +106,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
         genreNames: null,
         developerName: selectedGame?.developer ?? null,
         publisherName: null,
-        externalId: selectedGame ? String(selectedGame.igdbId) : null,
+        externalId: selectedGame ? String(selectedGame.appId) : null,
         idSource: selectedGame ? 'steam' : 'manual',
       });
       onGameAdded();
@@ -149,7 +149,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
           {/* Title */}
           <View style={s.titleBlock}>
             <Text style={[edStyles.displayTitle, { fontSize: 30 }]}>Track any title.</Text>
-            <Text style={s.titleSub}>Search IGDB or enter details manually.</Text>
+            <Text style={s.titleSub}>Search Steam or enter details manually.</Text>
           </View>
 
           {/* Search bar */}
@@ -170,16 +170,16 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
           {searchResults.length > 0 && (
             <View style={s.section}>
               <View style={edStyles.sectionHead}>
-                <Text style={edStyles.eyebrow}>{searchResults.length} results from IGDB</Text>
+                <Text style={edStyles.eyebrow}>{searchResults.length} results from Steam</Text>
               </View>
               <View style={edStyles.card}>
                 {searchResults.map((game, idx) => (
                   <TouchableOpacity
-                    key={game.igdbId}
+                    key={game.appId}
                     style={[
                       s.resultRow,
                       idx < searchResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line },
-                      selectedGame?.igdbId === game.igdbId && s.resultRowSelected,
+                      selectedGame?.appId === game.appId && s.resultRowSelected,
                     ]}
                     onPress={() => selectGame(game)}
                     activeOpacity={0.8}
@@ -199,7 +199,7 @@ export function ManualGameModal({ visible, onClose, onGameAdded }: Props) {
                         </View>
                       )}
                     </View>
-                    {selectedGame?.igdbId === game.igdbId ? (
+                    {selectedGame?.appId === game.appId ? (
                       <Ionicons name="checkmark-circle" size={18} color={ED.copper} />
                     ) : (
                       <Ionicons name="chevron-forward" size={14} color={ED.ink3} />

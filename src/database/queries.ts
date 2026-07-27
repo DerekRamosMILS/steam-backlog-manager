@@ -120,7 +120,7 @@ export function insertManualGame(draft: {
       draft.publisherName ? sanitizeText(draft.publisherName, 256) : null,
       draft.externalId ? sanitizeText(draft.externalId, 128) : null,
       sanitizeText(draft.idSource, 32),
-      draft.idSource === 'igdb' ? 'igdb' : 'manual',
+      draft.idSource === 'steam' ? 'steam' : 'manual',
     ]
   );
   const row = db.getFirstSync<{ id: number }>(`SELECT last_insert_rowid() as id`);

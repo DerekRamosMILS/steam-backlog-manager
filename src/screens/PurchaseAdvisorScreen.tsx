@@ -278,7 +278,7 @@ export default function PurchaseAdvisorScreen() {
               <View style={s.dropdown}>
                 {searchResults.map((item, idx) => (
                   <TouchableOpacity
-                    key={item.igdbId}
+                    key={item.appId}
                     style={[s.dropdownItem, idx < searchResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: ED.line }]}
                     onPress={() => handleSelectGame(item)}
                     activeOpacity={0.8}

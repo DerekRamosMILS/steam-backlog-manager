@@ -30,7 +30,7 @@ interface PlatformLoginModalProps {
  *
  * BacklogFlow supports Steam via the official Steam Web API (API key + public
  * profile). Games from other platforms can be added manually using the
- * "Add Game" button, which searches IGDB for rich metadata, artwork, and
+ * "Add Game" button, which searches the Steam catalog for metadata, artwork, and
  * completion estimates automatically.
  */
 export function PlatformLoginModal({

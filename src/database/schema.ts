@@ -75,11 +75,26 @@ export function initializeDatabase(): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,
       target INTEGER NOT NULL,
-      progress INTEGER NOT NULL DEFAULT 0,
+      progress REAL NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
       month_year TEXT NOT NULL
     );
   `);
+
+  // upsertChallenge used to plain-INSERT, so existing installs can hold several rows
+  // per (type, month_year). Collapse them to the furthest progress before the index.
+  db.execSync(`
+    DELETE FROM backlog_challenges WHERE id NOT IN (
+      SELECT id FROM backlog_challenges b
+      WHERE b.progress = (
+        SELECT MAX(progress) FROM backlog_challenges c
+        WHERE c.type = b.type AND c.month_year = b.month_year
+      )
+      GROUP BY b.type, b.month_year
+    );
+  `);
+  db.execSync(`CREATE UNIQUE INDEX IF NOT EXISTS idx_challenges_type_month
+    ON backlog_challenges(type, month_year)`);
 
   // Settings table (key-value store)
   db.execSync(`

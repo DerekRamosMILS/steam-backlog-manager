@@ -1,5 +1,5 @@
 import { getDatabase } from './schema';
-import { Game, GameStatus, GamePriority, BacklogStats, AppSettings } from '../types';
+import { Game, GameStatus, GamePriority, BacklogStats, AppSettings, BacklogChallenge } from '../types';
 
 // ISO-8601 UTC timestamp for updated_at tracking.
 const NOW_UTC = `strftime('%Y-%m-%dT%H:%M:%SZ', 'now')`;
@@ -363,16 +363,23 @@ export function getTotalPlaytimeMinutes(gameId: number): number {
 
 // ─── Challenges ───────────────────────────────────────────────────────────────
 
-export function getChallengesForMonth(monthYear: string) {
+export function getChallengesForMonth(monthYear: string): BacklogChallenge[] {
   const db = getDatabase();
-  return db.getAllSync(`SELECT * FROM backlog_challenges WHERE month_year = ?`, [monthYear]);
+  return db.getAllSync<BacklogChallenge>(
+    `SELECT * FROM backlog_challenges WHERE month_year = ? ORDER BY id`,
+    [monthYear]
+  );
 }
 
 export function upsertChallenge(type: string, target: number, progress: number, status: string, monthYear: string): void {
   const db = getDatabase();
   db.runSync(
     `INSERT INTO backlog_challenges (type, target, progress, status, month_year)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(type, month_year) DO UPDATE SET
+       target = excluded.target,
+       progress = excluded.progress,
+       status = excluded.status`,
     [type, target, progress, status, monthYear]
   );
 }

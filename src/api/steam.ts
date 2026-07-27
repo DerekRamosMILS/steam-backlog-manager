@@ -2,6 +2,7 @@ import { SteamApiResponse, SteamGame } from '../types';
 import { steamCoverUrl } from '../utils/formatters';
 
 const STEAM_API_BASE = 'https://api.steampowered.com';
+const STEAM_COMMUNITY_BASE = 'https://steamcommunity.com';
 
 /**
  * Extract a 64-bit SteamID from either a raw ID or a profile URL.
@@ -47,6 +48,59 @@ export async function resolveVanityUrl(
     throw new Error('Could not resolve Steam vanity URL. Check the username.');
   }
   return data.response.steamid as string;
+}
+
+export interface PublicProfile {
+  steamId64: string;
+  displayName: string;
+  isPublic: boolean;
+}
+
+/**
+ * Read the public community profile XML — no API key needed.
+ *
+ * Note: the games list (/games?tab=all&xml=1) is NOT usable for this; Steam now
+ * redirects it to the login page. Only the profile summary stays public, which is
+ * enough to resolve a vanity name and to check privacy before an import.
+ */
+export async function fetchPublicProfile(steamInput: string): Promise<PublicProfile> {
+  const parsed = parseSteamInput(steamInput);
+  const profilePath =
+    parsed.type === 'id'
+      ? `/profiles/${parsed.value}`
+      : `/id/${encodeURIComponent(parsed.value)}`;
+
+  const res = await fetch(`${STEAM_COMMUNITY_BASE}${profilePath}?xml=1`, {
+    headers: { Accept: 'text/xml,application/xml', 'User-Agent': 'BacklogFlow-Mobile-App' },
+  });
+  if (!res.ok) throw new Error(`Steam community error: ${res.status}`);
+
+  const xml = await res.text();
+
+  const errorMatch = xml.match(/<error>([\s\S]*?)<\/error>/);
+  if (errorMatch) {
+    throw new Error(stripCdata(errorMatch[1]) || 'Steam profile not found.');
+  }
+
+  const steamId64 = tag(xml, 'steamID64');
+  if (!/^\d{17}$/.test(steamId64)) {
+    throw new Error('Steam profile not found. Check the ID or profile URL.');
+  }
+
+  return {
+    steamId64,
+    displayName: stripCdata(tag(xml, 'steamID')),
+    isPublic: tag(xml, 'privacyState').toLowerCase() === 'public',
+  };
+}
+
+function tag(block: string, name: string): string {
+  const m = block.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`));
+  return m ? m[1].trim() : '';
+}
+
+function stripCdata(value: string): string {
+  return value.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '').trim();
 }
 
 /**

@@ -3,6 +3,7 @@ import { getAllSettings, setSetting, getSetting } from '../database/queries';
 import { Theme } from '../types';
 import { THEMES, ThemeColors } from '../services/themeService';
 import { useDatabase } from './useDatabase';
+import { syncReminders } from '../services/notificationService';
 import { Language } from '../i18n';
 
 // ─── Context shape ─────────────────────────────────────────────────────────────
@@ -57,6 +58,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!ready) return;
         refreshSettings();
     }, [ready]);
+
+    // Reminders are derived from library state, so rebuild them once the DB is up.
+    useEffect(() => {
+        if (!ready) return;
+        syncReminders(language).catch((e) => console.warn('[notifications]', e));
+    }, [ready, language]);
 
     // ── Theme ──────────────────────────────────────────────────────────────────
 

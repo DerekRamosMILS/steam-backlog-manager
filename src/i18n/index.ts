@@ -60,6 +60,34 @@ export const STRINGS = {
   dash_up_next: { en: 'Up Next', es: 'En Cola' },
   dash_paused: { en: 'Paused', es: 'En Pausa' },
   dash_see_all: { en: 'See all', es: 'Ver todo' },
+
+  // Monthly challenges
+  chal_title: { en: 'This month', es: 'Este mes' },
+  chal_done: { en: 'done', es: 'listos' },
+  chal_games_completed: { en: 'Finish games', es: 'Terminar juegos' },
+  chal_hours_played: { en: 'Hours played', es: 'Horas jugadas' },
+  chal_hltb_target_met: { en: 'Beat the HLTB estimate', es: 'Vencer la estimación de HLTB' },
+
+  // Local reminders
+  notif_stale_title: { en: 'Still on your plate', es: 'Sigue pendiente' },
+  notif_stale_body: {
+    en: "It's been {days} days since you played {game}. Pick it back up or move it along?",
+    es: 'Llevas {days} días sin jugar {game}. ¿Lo retomas o lo mueves?',
+  },
+  notif_challenge_title: { en: 'Month is closing', es: 'El mes se acaba' },
+  notif_challenge_body: {
+    en: 'You still have {count} challenge(s) open this month.',
+    es: 'Aún tienes {count} reto(s) abiertos este mes.',
+  },
+  set_notifications: { en: 'Reminders', es: 'Recordatorios' },
+  set_notifications_hint: {
+    en: 'Local only — nudges about stale games and unfinished challenges.',
+    es: 'Solo locales — avisos de juegos estancados y retos sin cerrar.',
+  },
+  set_notifications_denied: {
+    en: 'Notifications are blocked. Enable them for BacklogFlow in your system settings.',
+    es: 'Las notificaciones están bloqueadas. Actívalas para BacklogFlow en los ajustes del sistema.',
+  },
   dash_empty_title: { en: 'No games yet', es: 'Sin juegos aún' },
   dash_empty_text: { en: 'Go to Settings and import your Steam library to get started.', es: 'Ve a Ajustes e importa tu biblioteca de Steam para comenzar.' },
   dash_completed: { en: 'completed', es: 'completados' },

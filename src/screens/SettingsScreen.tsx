@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -17,6 +18,12 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { importSteamLibrary } from '../services/steamService';
 import { batchEnrichHLTB } from '../services/howLongToBeatService';
 import { batchEnrichPrices } from '../services/steamPriceService';
+import {
+  areNotificationsEnabled,
+  requestNotificationPermission,
+  setNotificationsEnabled,
+  syncReminders,
+} from '../services/notificationService';
 import { getSetting, setSetting, convertAllGamePrices, deleteAllLocalData } from '../database/queries';
 import { getToken, setToken, clearTokens } from '../services/secureTokenService';
 import { exportData, importData } from '../services/cloudSyncService';
@@ -47,14 +54,29 @@ export default function SettingsScreen() {
   } | null>(null);
   const [currency, setCurrency] = useState<'usd' | 'mxn'>('usd');
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [notificationsOn, setNotificationsOn] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       setSteamId(getSetting('steam_id'));
       setCurrency((getSetting('currency') as 'usd' | 'mxn') || 'usd');
+      setNotificationsOn(areNotificationsEnabled());
       getToken('steam', 'api_key').then(key => { if (key) setApiKey(key); });
     }, [])
   );
+
+  const handleToggleNotifications = async (next: boolean) => {
+    if (next) {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        Alert.alert(t('set_notifications', language), t('set_notifications_denied', language));
+        return;
+      }
+    }
+    setNotificationsEnabled(next);
+    setNotificationsOn(next);
+    await syncReminders(language);
+  };
 
   const handleSave = () => {
     setSetting('steam_id', steamId.trim());
@@ -258,6 +280,23 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          {/* Reminders */}
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: ED.surface2 }]}>
+              <Ionicons name="notifications-outline" size={15} color={ED.ink2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>{t('set_notifications', language)}</Text>
+              <Text style={s.fieldHint}>{t('set_notifications_hint', language)}</Text>
+            </View>
+            <Switch
+              value={notificationsOn}
+              onValueChange={handleToggleNotifications}
+              trackColor={{ false: ED.surface3, true: ED.copperBg }}
+              thumbColor={notificationsOn ? ED.copper : ED.ink3}
+            />
           </View>
 
           {/* Currency */}

@@ -10,6 +10,7 @@ import {
 } from '../database/queries';
 import { Game, GameStatus, GamePriority, BacklogStats } from '../types';
 import { recordCompletionCelebration } from '../services/recommendationService';
+import { evaluateGameCompletion } from '../services/challengeService';
 
 export function useGames() {
   const [games, setGames] = useState<Game[]>([]);
@@ -44,6 +45,7 @@ export function useGames() {
       const nextStats = getBacklogStats();
       if (current && updated && current.status !== 'completed' && status === 'completed') {
         recordCompletionCelebration(updated, previousStats.total_hours_remaining, nextStats.total_hours_remaining);
+        evaluateGameCompletion(updated);
       }
       refresh();
     },

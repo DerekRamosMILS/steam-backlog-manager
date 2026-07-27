@@ -12,9 +12,11 @@ import { getDailyPick, getRecommendations } from '../services/recommendationServ
 import { GameCover } from '../components/GameCover';
 import { PickNextGameModal } from '../components/PickNextGameModal';
 import { SessionTimerModal } from '../components/SessionTimerModal';
+import { MonthlyChallenges } from '../components/MonthlyChallenges';
+import { getCurrentMonthChallenges } from '../services/challengeService';
 import { ED, edStyles, STATUS_COLORS, MONO_FONT } from '../styles/editorial';
 import { t } from '../i18n';
-import { Game, Recommendation, DailyPick } from '../types';
+import { Game, Recommendation, DailyPick, BacklogChallenge } from '../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -26,6 +28,7 @@ export default function DashboardScreen() {
   const [timerGame, setTimerGame] = useState<Game | null>(null);
   const [topRecs, setTopRecs] = useState<Recommendation[]>([]);
   const [dailyPick, setDailyPick] = useState<DailyPick | null>(null);
+  const [challenges, setChallenges] = useState<BacklogChallenge[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +36,7 @@ export default function DashboardScreen() {
       refreshRec();
       setDailyPick(getDailyPick());
       setTopRecs(getRecommendations({ limit: 3 }));
+      setChallenges(getCurrentMonthChallenges());
     }, [refresh, refreshRec])
   );
 
@@ -259,6 +263,9 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* ── Monthly challenges ──────────────────────────────── */}
+        <MonthlyChallenges challenges={challenges} lang={language} />
 
         {/* ── Up Next ─────────────────────────────────────────── */}
         {upNext.length > 0 && (

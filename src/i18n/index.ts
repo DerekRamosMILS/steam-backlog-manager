@@ -84,6 +84,81 @@ export const STRINGS = {
     en: 'Local only — nudges about stale games and unfinished challenges.',
     es: 'Solo locales — avisos de juegos estancados y retos sin cerrar.',
   },
+  // Shared status / priority labels
+  st_completed: { en: 'Completed', es: 'Completado' },
+  st_abandoned: { en: 'Abandoned', es: 'Abandonado' },
+
+  // Game detail
+  gd_not_found: { en: 'Game not found.', es: 'Juego no encontrado.' },
+  gd_progress: { en: 'Progress', es: 'Progreso' },
+  gd_drag_to_update: { en: 'Drag to update', es: 'Arrastra para actualizar' },
+  gd_start_session: { en: 'Start session', es: 'Empezar sesión' },
+  gd_specs: { en: 'Specs', es: 'Ficha' },
+  gd_recent_sessions: { en: 'Recent sessions', es: 'Sesiones recientes' },
+  gd_average: { en: 'Average', es: 'Media' },
+  gd_log_session: { en: 'Log session', es: 'Registrar sesión' },
+  gd_save: { en: 'Save', es: 'Guardar' },
+  gd_change_status: { en: 'Change status', es: 'Cambiar estado' },
+  gd_priority: { en: 'Priority', es: 'Prioridad' },
+  gd_notes: { en: 'Notes', es: 'Notas' },
+  gd_exclude: { en: 'Exclude from backlog', es: 'Excluir del backlog' },
+  gd_exclude_hint: {
+    en: "Won't appear in stats or recommendations",
+    es: 'No aparecerá en estadísticas ni recomendaciones',
+  },
+  gd_refresh_hltb: { en: 'Refresh HLTB', es: 'Actualizar HLTB' },
+  gd_saved: { en: 'Saved', es: 'Guardado' },
+  gd_notes_saved: { en: 'Notes saved.', es: 'Notas guardadas.' },
+  gd_hltb_not_found: { en: 'Not found', es: 'No encontrado' },
+  gd_hltb_not_found_msg: {
+    en: 'Could not find this game on HowLongToBeat.',
+    es: 'No se encontró este juego en HowLongToBeat.',
+  },
+  gd_hltb_failed: { en: 'HLTB failed', es: 'Falló HLTB' },
+  gd_hltb_blocked: { en: 'Request blocked.', es: 'Petición bloqueada.' },
+  gd_invalid: { en: 'Invalid', es: 'Dato inválido' },
+  gd_invalid_minutes: {
+    en: 'Enter a valid number of minutes.',
+    es: 'Escribe un número de minutos válido.',
+  },
+  gd_remove_title: { en: 'Remove Game', es: 'Eliminar juego' },
+  gd_remove_msg: {
+    en: 'Remove this game from your library?',
+    es: '¿Eliminar este juego de tu biblioteca?',
+  },
+  gd_cancel: { en: 'Cancel', es: 'Cancelar' },
+  gd_last_played: { en: 'last played', es: 'última vez' },
+  gd_played: { en: 'played', es: 'jugado' },
+  gd_platform_other: { en: 'Other', es: 'Otra' },
+  gd_spec_main: { en: 'Main story', es: 'Historia principal' },
+  gd_spec_extras: { en: '+ Extras', es: '+ Extras' },
+  gd_spec_completionist: { en: 'Completionist', es: 'Completista' },
+  gd_spec_remaining: { en: 'Remaining', es: 'Restante' },
+  gd_spec_platform: { en: 'Platform', es: 'Plataforma' },
+  gd_spec_released: { en: 'Released', es: 'Lanzamiento' },
+  fmt_never_played: { en: 'Never played', es: 'Nunca jugado' },
+  fmt_today: { en: 'Today', es: 'Hoy' },
+  fmt_yesterday: { en: 'Yesterday', es: 'Ayer' },
+  fmt_days_ago: { en: 'd ago', es: 'd atrás' },
+  fmt_months_ago: { en: 'mo ago', es: 'mes atrás' },
+  fmt_years_ago: { en: 'y ago', es: 'a atrás' },
+  gd_remove: { en: 'Remove', es: 'Eliminar' },
+
+  // Settings sections
+  set_title_display: { en: 'Settings.', es: 'Ajustes.' },
+  set_sec_platforms: { en: 'Connected platforms', es: 'Plataformas conectadas' },
+  set_sec_data_quality: { en: 'Data quality', es: 'Calidad de datos' },
+  set_sec_appearance: { en: 'Appearance', es: 'Apariencia' },
+  set_sec_discovery: { en: 'Discovery', es: 'Descubrimiento' },
+  set_sec_data: { en: 'Data', es: 'Datos' },
+  set_sec_about: { en: 'About', es: 'Acerca de' },
+  set_storage_value: { en: 'Offline SQLite', es: 'SQLite sin conexión' },
+  set_privacy: { en: 'Privacy Policy', es: 'Política de privacidad' },
+  set_tagline: {
+    en: 'Built for the patient player.',
+    es: 'Hecho para quien juega con calma.',
+  },
+
   // Add-game modal
   mgm_header: { en: 'ADD GAME', es: 'AÑADIR JUEGO' },
   mgm_display_title: { en: 'Track any title.', es: 'Registra cualquier título.' },
@@ -609,6 +684,22 @@ export const STRINGS = {
 } as const;
 
 export type StringKey = keyof typeof STRINGS;
+
+/** Status/priority keys live here so any screen can translate a raw DB value. */
+export const STATUS_KEYS: Record<string, StringKey> = {
+  not_started: 'st_not_started',
+  up_next: 'st_up_next',
+  playing: 'st_playing',
+  paused: 'st_paused',
+  completed: 'st_completed',
+  abandoned: 'st_abandoned',
+};
+
+export const PRIORITY_KEYS: Record<string, StringKey> = {
+  high: 'pr_high',
+  medium: 'pr_medium',
+  low: 'pr_low',
+};
 
 export function t(key: StringKey, lang: Language): string {
   const entry = STRINGS[key] as { en: string; es: string };

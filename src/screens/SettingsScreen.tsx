@@ -230,16 +230,16 @@ export default function SettingsScreen() {
           {playerName && (
             <Text style={[edStyles.eyebrow, { marginBottom: 6 }]}>ACCOUNT · {(playerName as string).toUpperCase()}</Text>
           )}
-          <Text style={[edStyles.displayTitle, { fontSize: 38 }]}>Settings.</Text>
+          <Text style={[edStyles.displayTitle, { fontSize: 38 }]}>{t('set_title_display', language)}</Text>
         </View>
 
         {/* ── Libraries ── */}
-        <SettingsSection title={t('set_steam_account', language) as string} subtitle="Connected platforms">
+        <SettingsSection title={t('set_steam_account', language) as string} subtitle={t('set_sec_platforms', language)}>
           <LibraryManager />
         </SettingsSection>
 
         {/* ── Data quality ── */}
-        <SettingsSection title="Data quality">
+        <SettingsSection title={t('set_sec_data_quality', language)}>
           <ProgressableRow
             icon="time-outline"
             label={t('set_sync_hltb', language) as string}
@@ -259,7 +259,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* ── Appearance ── */}
-        <SettingsSection title="Appearance">
+        <SettingsSection title={t('set_sec_appearance', language)}>
           {/* Language */}
           <View style={s.row}>
             <View style={[s.rowIcon, { backgroundColor: ED.surface2 }]}>
@@ -388,7 +388,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* ── Discovery ── */}
-        <SettingsSection title="Discovery">
+        <SettingsSection title={t('set_sec_discovery', language)}>
           <SettingsRow
             icon="cart-outline"
             label="Purchase Advisor"
@@ -405,7 +405,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* ── Data ── */}
-        <SettingsSection title="Data">
+        <SettingsSection title={t('set_sec_data', language)}>
           <SettingsRow
             icon="download-outline"
             label={t('settings_export_btn', language) as string}
@@ -428,15 +428,15 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* ── About ── */}
-        <SettingsSection title="About">
+        <SettingsSection title={t('set_sec_about', language)}>
           <SettingsRow icon="map-outline" label="App Tour" sub="Quick feature walkthrough" onPress={() => setShowTutorial(true)} />
           <View style={[edStyles.specRow, { paddingHorizontal: 16 }]}>
-            <Text style={edStyles.specKey}>Version</Text>
+            <Text style={edStyles.specKey}>{t('set_version', language)}</Text>
             <Text style={edStyles.specVal}>1.0.0</Text>
           </View>
           <View style={[edStyles.specRow, { paddingHorizontal: 16 }]}>
-            <Text style={edStyles.specKey}>Storage</Text>
-            <Text style={edStyles.specVal}>Offline SQLite</Text>
+            <Text style={edStyles.specKey}>{t('set_storage', language)}</Text>
+            <Text style={edStyles.specVal}>{t('set_storage_value', language)}</Text>
           </View>
           <TouchableOpacity
             style={[s.row, { borderBottomWidth: 0 }]}
@@ -446,7 +446,7 @@ export default function SettingsScreen() {
             <View style={[s.rowIcon, { backgroundColor: ED.surface2 }]}>
               <Ionicons name="shield-checkmark-outline" size={15} color={ED.ink2} />
             </View>
-            <Text style={s.rowLabel}>Privacy Policy</Text>
+            <Text style={s.rowLabel}>{t('set_privacy', language)}</Text>
             <Ionicons name="chevron-forward" size={14} color={ED.ink3} />
           </TouchableOpacity>
         </SettingsSection>
@@ -454,7 +454,7 @@ export default function SettingsScreen() {
         {/* Footer */}
         <View style={s.footer}>
           <Text style={s.footerEyebrow}>BACKLOGFLOW · 2026</Text>
-          <Text style={s.footerTagline}>Built for the patient player.</Text>
+          <Text style={s.footerTagline}>{t('set_tagline', language)}</Text>
         </View>
 
         <View style={{ height: 120 }} />

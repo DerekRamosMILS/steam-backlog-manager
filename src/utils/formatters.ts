@@ -1,4 +1,5 @@
 import { GameStatus, GamePriority } from '../types';
+import { t, Language } from '../i18n';
 
 /**
  * Convert minutes to a human-readable hours string.
@@ -55,16 +56,19 @@ export function formatBacklogHours(hours: number): string {
 /**
  * Take a Unix timestamp and return "X days ago" / "Today" / ISO date.
  */
-export function formatLastPlayed(unixTs: number | null | undefined): string {
-  if (!unixTs) return 'Never played';
+export function formatLastPlayed(
+  unixTs: number | null | undefined,
+  lang: Language = 'en'
+): string {
+  if (!unixTs) return t('fmt_never_played', lang);
   const now = Date.now();
   const diff = now - unixTs * 1000;
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (days === 0) return t('fmt_today', lang);
+  if (days === 1) return t('fmt_yesterday', lang);
+  if (days < 30) return `${days}${t('fmt_days_ago', lang)}`;
+  if (days < 365) return `${Math.floor(days / 30)}${t('fmt_months_ago', lang)}`;
+  return `${Math.floor(days / 365)}${t('fmt_years_ago', lang)}`;
 }
 
 /**

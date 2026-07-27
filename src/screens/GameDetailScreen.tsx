@@ -21,6 +21,7 @@ import { enrichGameWithHLTB } from '../services/howLongToBeatService';
 import { logSessionAndUpdateGame } from '../services/gamingSessionService';
 import { getGamingSessionsForGame } from '../database/queries';
 import { useAppContext } from '../hooks/useAppContext';
+import { t, STATUS_KEYS, PRIORITY_KEYS } from '../i18n';
 import {
   formatMinutes,
   formatHLTBTime,
@@ -85,7 +86,7 @@ export default function GameDetailScreen() {
   const handleSaveNotes = () => {
     if (!game) return;
     setNotes(game.id, notes);
-    Alert.alert('Saved', 'Notes saved.');
+    Alert.alert(t('gd_saved', language), t('gd_notes_saved', language));
   };
 
   const handleFetchHLTB = async () => {
@@ -95,14 +96,14 @@ export default function GameDetailScreen() {
     setFetching(false);
     refresh();
     load();
-    if (result.status === 'not_found') Alert.alert('Not found', 'Could not find this game on HowLongToBeat.');
-    if (result.status === 'request_failed') Alert.alert('HLTB failed', result.errorMessage ?? 'Request blocked.');
+    if (result.status === 'not_found') Alert.alert(t('gd_hltb_not_found', language), t('gd_hltb_not_found_msg', language));
+    if (result.status === 'request_failed') Alert.alert(t('gd_hltb_failed', language), result.errorMessage ?? t('gd_hltb_blocked', language));
   };
 
   const handleLogSession = () => {
     if (!game) return;
     const mins = parseInt(sessionMinutes, 10);
-    if (isNaN(mins) || mins <= 0) { Alert.alert('Invalid', 'Enter a valid number of minutes.'); return; }
+    if (isNaN(mins) || mins <= 0) { Alert.alert(t('gd_invalid', language), t('gd_invalid_minutes', language)); return; }
     logSessionAndUpdateGame(game, mins);
     setSessionMinutes('');
     refresh();
@@ -110,9 +111,9 @@ export default function GameDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert('Remove Game', 'Remove this game from your library?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => { if (game) remove(game.id); router.back(); } },
+    Alert.alert(t('gd_remove_title', language), t('gd_remove_msg', language), [
+      { text: t('gd_cancel', language), style: 'cancel' },
+      { text: t('gd_remove', language), style: 'destructive', onPress: () => { if (game) remove(game.id); router.back(); } },
     ]);
   };
 
@@ -122,7 +123,7 @@ export default function GameDetailScreen() {
         <TouchableOpacity style={s.backBtnAlt} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={ED.ink} />
         </TouchableOpacity>
-        <Text style={{ color: ED.ink3, padding: 40, textAlign: 'center' }}>Game not found.</Text>
+        <Text style={{ color: ED.ink3, padding: 40, textAlign: 'center' }}>{t('gd_not_found', language)}</Text>
       </View>
     );
   }
@@ -177,12 +178,12 @@ export default function GameDetailScreen() {
           <View style={s.badgeRow}>
             <View style={[s.statusChip, { backgroundColor: statusInfo.bg, borderColor: statusInfo.color + '40' }]}>
               <View style={[s.statusDot, { backgroundColor: statusInfo.color }]} />
-              <Text style={[s.statusChipText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+              <Text style={[s.statusChipText, { color: statusInfo.color }]}>{t(STATUS_KEYS[game.status] ?? 'st_not_started', language)}</Text>
             </View>
             {game.priority && (
               <View style={[edStyles.chip]}>
                 <Text style={[edStyles.chipText, { color: game.priority === 'high' ? ED.rust : game.priority === 'medium' ? ED.amber : ED.ink3 }]}>
-                  {game.priority === 'high' ? '↑ High' : game.priority === 'medium' ? '→ Med' : '↓ Low'}
+                  {(game.priority === 'high' ? '↑ ' : game.priority === 'medium' ? '→ ' : '↓ ') + t(PRIORITY_KEYS[game.priority] ?? 'pr_medium', language)}
                 </Text>
               </View>
             )}
@@ -198,9 +199,9 @@ export default function GameDetailScreen() {
           <View style={[edStyles.card, s.section]}>
             <View style={{ padding: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={edStyles.eyebrow}>Progress</Text>
+                <Text style={edStyles.eyebrow}>{t('gd_progress', language)}</Text>
                 <Text style={[s.lastPlayed]}>
-                  last played {formatLastPlayed(game.last_played ? new Date(game.last_played).getTime() / 1000 : null)}
+                  {t('gd_last_played', language)} {formatLastPlayed(game.last_played ? new Date(game.last_played).getTime() / 1000 : null, language)}
                 </Text>
               </View>
               <View style={s.progressNumRow}>
@@ -212,7 +213,7 @@ export default function GameDetailScreen() {
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
                 <Text style={s.progressMeta}>
-                  <Text style={{ color: ED.ink }}>{formatMinutes(game.playtime_minutes)}</Text> played
+                  <Text style={{ color: ED.ink }}>{formatMinutes(game.playtime_minutes)}</Text> {t('gd_played', language)}
                 </Text>
                 {remainingMinutes !== null && (
                   <Text style={s.progressMeta}>
@@ -222,7 +223,7 @@ export default function GameDetailScreen() {
               </View>
 
               {/* Slider */}
-              <Text style={[s.sliderHint]}>Drag to update</Text>
+              <Text style={[s.sliderHint]}>{t('gd_drag_to_update', language)}</Text>
               <Slider
                 minimumValue={0}
                 maximumValue={100}
@@ -246,7 +247,7 @@ export default function GameDetailScreen() {
             >
               <Ionicons name="play" size={16} color="#1A1108" />
               <Text style={[edStyles.btnText, edStyles.btnPrimaryText, { fontSize: 15 }]}>
-                {lang === 'es' ? 'Empezar sesión' : 'Start session'}
+                {lang === 'es' ? 'Empezar sesión' : t('gd_start_session', language)}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -261,20 +262,20 @@ export default function GameDetailScreen() {
           {/* ── Spec table ── */}
           <View style={s.section}>
             <View style={edStyles.sectionHead}>
-              <Text style={edStyles.eyebrow}>Specs</Text>
+              <Text style={edStyles.eyebrow}>{t('gd_specs', language)}</Text>
               <TouchableOpacity onPress={handleFetchHLTB} disabled={fetching}>
                 <Ionicons name={fetching ? 'sync' : 'refresh-outline'} size={14} color={ED.copper} />
               </TouchableOpacity>
             </View>
             <View style={edStyles.card}>
-              <SpecRow label="Main story" value={formatHLTBTime(game.hltb_main_story)} />
-              <SpecRow label="+ Extras" value={formatHLTBTime(game.hltb_extra)} />
-              <SpecRow label="Completionist" value={formatHLTBTime(game.hltb_completionist)} />
+              <SpecRow label={t('gd_spec_main', language)} value={formatHLTBTime(game.hltb_main_story)} />
+              <SpecRow label={t('gd_spec_extras', language)} value={formatHLTBTime(game.hltb_extra)} />
+              <SpecRow label={t('gd_spec_completionist', language)} value={formatHLTBTime(game.hltb_completionist)} />
               {remainingMinutes !== null && (
-                <SpecRow label="Remaining" value={formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} accent />
+                <SpecRow label={t('gd_spec_remaining', language)} value={formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} accent />
               )}
-              <SpecRow label="Platform" value={game.platform.charAt(0).toUpperCase() + game.platform.slice(1)} />
-              {game.release_year ? <SpecRow label="Released" value={String(game.release_year)} last /> : null}
+              <SpecRow label={t('gd_spec_platform', language)} value={game.platform === 'other' ? t('gd_platform_other', language) : game.platform.charAt(0).toUpperCase() + game.platform.slice(1)} />
+              {game.release_year ? <SpecRow label={t('gd_spec_released', language)} value={String(game.release_year)} last /> : null}
             </View>
           </View>
 
@@ -282,7 +283,7 @@ export default function GameDetailScreen() {
           {sessions.length > 0 && (
             <View style={s.section}>
               <View style={edStyles.sectionHead}>
-                <Text style={edStyles.eyebrow}>Recent sessions</Text>
+                <Text style={edStyles.eyebrow}>{t('gd_recent_sessions', language)}</Text>
                 <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>{sessions.length} total</Text>
               </View>
               <View style={edStyles.card}>
@@ -307,7 +308,7 @@ export default function GameDetailScreen() {
                 })}
               </View>
               {avgSession && (
-                <Text style={s.sessAvg}>Average <Text style={{ color: ED.ink, fontFamily: MONO_FONT }}>{avgSession}m</Text> per session</Text>
+                <Text style={s.sessAvg}>{t('gd_average', language)} <Text style={{ color: ED.ink, fontFamily: MONO_FONT }}>{avgSession}m</Text> per session</Text>
               )}
             </View>
           )}
@@ -315,7 +316,7 @@ export default function GameDetailScreen() {
           {/* ── Log session manually ── */}
           <View style={s.section}>
             <View style={edStyles.sectionHead}>
-              <Text style={edStyles.eyebrow}>Log session</Text>
+              <Text style={edStyles.eyebrow}>{t('gd_log_session', language)}</Text>
             </View>
             <View style={edStyles.card}>
               <View style={{ padding: 16, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -332,7 +333,7 @@ export default function GameDetailScreen() {
                   onPress={handleLogSession}
                   activeOpacity={0.8}
                 >
-                  <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>Save</Text>
+                  <Text style={[edStyles.btnText, edStyles.btnPrimaryText]}>{t('gd_save', language)}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -341,7 +342,7 @@ export default function GameDetailScreen() {
           {/* ── Status grid ── */}
           <View style={s.section}>
             <View style={edStyles.sectionHead}>
-              <Text style={edStyles.eyebrow}>Change status</Text>
+              <Text style={edStyles.eyebrow}>{t('gd_change_status', language)}</Text>
             </View>
             <View style={s.statusGrid}>
               {(Object.keys(STATUS_CONFIG) as GameStatus[]).map((st) => {
@@ -359,7 +360,7 @@ export default function GameDetailScreen() {
                     activeOpacity={0.75}
                   >
                     <Ionicons name={cfg.icon as any} size={13} color={active ? sc.color : ED.ink3} />
-                    <Text style={[s.statusBtnText, { color: active ? sc.color : ED.ink3 }]}>{sc.label}</Text>
+                    <Text style={[s.statusBtnText, { color: active ? sc.color : ED.ink3 }]}>{t(STATUS_KEYS[st] ?? 'st_not_started', language)}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -369,7 +370,7 @@ export default function GameDetailScreen() {
           {/* ── Priority ── */}
           <View style={s.section}>
             <View style={edStyles.sectionHead}>
-              <Text style={edStyles.eyebrow}>Priority</Text>
+              <Text style={edStyles.eyebrow}>{t('gd_priority', language)}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(Object.keys(PRIORITY_CONFIG) as GamePriority[]).map((p) => {
@@ -397,7 +398,7 @@ export default function GameDetailScreen() {
           {/* ── Notes ── */}
           <View style={s.section}>
             <View style={edStyles.sectionHead}>
-              <Text style={edStyles.eyebrow}>Notes</Text>
+              <Text style={edStyles.eyebrow}>{t('gd_notes', language)}</Text>
               <TouchableOpacity onPress={handleSaveNotes}>
                 <Text style={{ fontFamily: MONO_FONT, fontSize: 11, fontWeight: '600', color: ED.copper }}>SAVE</Text>
               </TouchableOpacity>
@@ -422,8 +423,8 @@ export default function GameDetailScreen() {
                 <Ionicons name="eye-off-outline" size={15} color={ED.ink3} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.excludeLabel}>Exclude from backlog</Text>
-                <Text style={s.excludeSub}>Won't appear in stats or recommendations</Text>
+                <Text style={s.excludeLabel}>{t('gd_exclude', language)}</Text>
+                <Text style={s.excludeSub}>{t('gd_exclude_hint', language)}</Text>
               </View>
               <Switch
                 value={game.exclude_from_backlog === 1}
@@ -441,11 +442,11 @@ export default function GameDetailScreen() {
           <View style={[s.section, { flexDirection: 'row', justifyContent: 'center', gap: 28 }]}>
             <TouchableOpacity style={s.ghostAction} onPress={handleFetchHLTB} disabled={fetching}>
               <Ionicons name="refresh-outline" size={14} color={ED.ink3} />
-              <Text style={s.ghostActionText}>Refresh HLTB</Text>
+              <Text style={s.ghostActionText}>{t('gd_refresh_hltb', language)}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.ghostAction} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={14} color={ED.rust} />
-              <Text style={[s.ghostActionText, { color: ED.rust }]}>Remove</Text>
+              <Text style={[s.ghostActionText, { color: ED.rust }]}>{t('gd_remove', language)}</Text>
             </TouchableOpacity>
           </View>
 

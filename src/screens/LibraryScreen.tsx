@@ -12,7 +12,7 @@ import { ManualGameModal } from '../components/ManualGameModal';
 import { Game, GameStatus, Platform as GamePlatform } from '../types';
 import { priorityWeight } from '../utils/formatters';
 import { ED, edStyles, STATUS_COLORS, PRIORITY_COLORS, MONO_FONT } from '../styles/editorial';
-import { t, Language } from '../i18n';
+import { t, Language, STATUS_KEYS } from '../i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -145,7 +145,7 @@ export default function LibraryScreen() {
           <Text style={styles.listTitle} numberOfLines={1}>{item.title}</Text>
           <View style={styles.listMetaRow}>
             <View style={[edStyles.chip, { paddingHorizontal: 7, paddingVertical: 3 }]}>
-              <Text style={[edStyles.chipText, { color: sc.color, fontSize: 10 }]}>{sc.label}</Text>
+              <Text style={[edStyles.chipText, { color: sc.color, fontSize: 10 }]}>{t(STATUS_KEYS[item.status] ?? 'st_not_started', language)}</Text>
             </View>
             {item.hltb_main_story !== null && (
               <Text style={[edStyles.eyebrow, { color: ED.ink3 }]}>

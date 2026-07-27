@@ -521,7 +521,7 @@ const s = StyleSheet.create({
     backgroundColor: ED.surface3,
   },
   stackedSegment: {},
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px' as any, paddingVertical: 10, paddingHorizontal: 16 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 16 },
   breakdownDot: { width: 10, height: 10, borderRadius: 2 },
   breakdownLabel: { flex: 1, fontSize: 13.5, color: ED.ink2, fontWeight: '500' },
   breakdownPct: { fontFamily: MONO_FONT, fontSize: 12, color: ED.ink3 },

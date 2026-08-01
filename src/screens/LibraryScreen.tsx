@@ -11,7 +11,7 @@ import { GameCover } from '../components/GameCover';
 import { ManualGameModal } from '../components/ManualGameModal';
 import { Game, GameStatus, Platform as GamePlatform } from '../types';
 import { priorityWeight } from '../utils/formatters';
-import { ED, edStyles, STATUS_COLORS, PRIORITY_COLORS, MONO_FONT } from '../styles/editorial';
+import { ED, edStyles, STATUS_COLORS, MONO_FONT } from '../styles/editorial';
 import { t, Language, STATUS_KEYS } from '../i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

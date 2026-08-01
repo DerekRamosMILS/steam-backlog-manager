@@ -29,7 +29,7 @@ import {
   formatRemainingTime,
   getRemainingMinutes,
 } from '../utils/formatters';
-import { Game, GameStatus, GamePriority, Platform as GamePlatform, STATUS_CONFIG, PRIORITY_CONFIG } from '../types';
+import { Game, GameStatus, GamePriority, STATUS_CONFIG, PRIORITY_CONFIG } from '../types';
 import { ED, edStyles, MONO_FONT, STATUS_COLORS, coverPaletteFor } from '../styles/editorial';
 
 const { width } = Dimensions.get('window');

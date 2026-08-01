@@ -31,7 +31,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { LibraryManager } from '../components/LibraryManager';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import { useAppContext } from '../hooks/useAppContext';
-import { t, Language } from '../i18n';
+import { t } from '../i18n';
 import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 export default function SettingsScreen() {

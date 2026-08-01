@@ -10,13 +10,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useGames } from '../hooks/useGames';
-import { formatBacklogHours } from '../utils/formatters';
 import { useAppContext } from '../hooks/useAppContext';
 import { t, Language } from '../i18n';
 import { BacklogStats, Game } from '../types';
 import { getAllSettings } from '../database/queries';
 import { calculateCompletionTimeline } from '../services/plannerService';
-import { ED, edStyles, MONO_FONT, STATUS_COLORS } from '../styles/editorial';
+import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 const DAILY_SCENARIOS: { v: string; h: number; sub: string }[] = [
   { v: '1h', h: 1, sub: 'casual' },
@@ -423,7 +422,7 @@ function computeShame(stats: BacklogStats): number {
 
 function getShameVerdict(shame: number, hoursRemaining: number, lang: Language): string {
   const finishYear = new Date().getFullYear() + Math.ceil(hoursRemaining / 365);
-  const tiers: Array<{ min: number; en: string; es: string }> = [
+  const tiers: { min: number; en: string; es: string }[] = [
     { min: 0, en: "You're suspiciously functional.\nAre you okay?", es: 'Eres sospechosamente funcional.\n¿Estás bien?' },
     { min: 20, en: 'A healthy backlog.\nA lie you tell yourself.', es: 'Un backlog saludable.\nUna mentira que te dices.' },
     { min: 40, en: 'The backlog grows.\nSteam sales were a mistake.', es: 'El backlog crece.\nLas ofertas de Steam fueron un error.' },
@@ -441,7 +440,7 @@ function getShameVerdict(shame: number, hoursRemaining: number, lang: Language):
 
 function getShameDiagnosis(shame: number, stats: BacklogStats, lang: Language): string {
   const untouched = stats.not_started;
-  const tiers: Array<{ min: number; en: string; es: string }> = [
+  const tiers: { min: number; en: string; es: string }[] = [
     { min: 0, en: `Clean collection. Only ${untouched} untouched titles. Respect.`, es: `Colección limpia. Solo ${untouched} sin tocar. Respeto.` },
     { min: 25, en: `Mild hoarding detected. ${untouched} games untouched. Manageable.`, es: `Acumulación leve detectada. ${untouched} juegos sin tocar. Manejable.` },
     { min: 45, en: `Chronic sale fever. ${untouched} games untouched. Consider a backlog diet.`, es: `Fiebre crónica de ofertas. ${untouched} juegos sin tocar. Considera una dieta de backlog.` },

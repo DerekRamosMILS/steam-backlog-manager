@@ -274,7 +274,7 @@ export interface EpicGame {
   productSlug?: string;
   developer?: string;
   metadata?: Record<string, any> | null;
-  keyImages: Array<{ type: string; url: string }>;
+  keyImages: { type: string; url: string }[];
 }
 
 // ─── Multi-Platform Connection ────────────────────────────────────────────────

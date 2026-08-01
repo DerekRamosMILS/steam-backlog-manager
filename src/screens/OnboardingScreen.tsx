@@ -15,7 +15,7 @@ import { setSetting } from '../database/queries';
 import { t, Language } from '../i18n';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import { useAppContext } from '../hooks/useAppContext';
-import { ED, MONO_FONT } from '../styles/editorial';
+import { ED } from '../styles/editorial';
 
 interface Props {
   onComplete: () => void;

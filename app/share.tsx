@@ -53,7 +53,7 @@ function computeShame(stats: BacklogStats): number {
 function getVerdict(shame: number, stats: BacklogStats, lang: Language): string {
   const finishYear = new Date().getFullYear() + Math.ceil(stats.total_hours_remaining / 365);
 
-  const tiers: Array<{ min: number; en: string; es: string }> = [
+  const tiers: { min: number; en: string; es: string }[] = [
     {
       min: 0,
       en: "You're suspiciously functional.\nAre you even a gamer?",

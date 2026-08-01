@@ -15,7 +15,6 @@ import { useAppContext } from '../hooks/useAppContext';
 import { t, Language } from '../i18n';
 import { setSetting } from '../database/queries';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface TutorialStep {
   icon: keyof typeof Ionicons.glyphMap;

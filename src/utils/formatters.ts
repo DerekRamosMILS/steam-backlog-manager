@@ -98,7 +98,7 @@ export function gogCoverUrl(imageSlug: string): string {
 /**
  * Extract the best cover image from Epic's keyImages array.
  */
-export function epicCoverUrl(keyImages: Array<{ type: string; url: string }>): string {
+export function epicCoverUrl(keyImages: { type: string; url: string }[]): string {
   const preferred = ['DieselStoreFrontWide', 'OfferImageWide', 'DieselGameBoxTall', 'Thumbnail'];
   for (const type of preferred) {
     const img = keyImages.find((ki) => ki.type === type);

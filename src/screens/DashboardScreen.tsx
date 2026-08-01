@@ -14,7 +14,7 @@ import { PickNextGameModal } from '../components/PickNextGameModal';
 import { SessionTimerModal } from '../components/SessionTimerModal';
 import { MonthlyChallenges } from '../components/MonthlyChallenges';
 import { getCurrentMonthChallenges } from '../services/challengeService';
-import { ED, edStyles, STATUS_COLORS, MONO_FONT } from '../styles/editorial';
+import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 import { t } from '../i18n';
 import { Game, Recommendation, DailyPick, BacklogChallenge } from '../types';
 

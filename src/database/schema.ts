@@ -112,7 +112,6 @@ export function initializeDatabase(): void {
       ('default_sort',  'priority'),
       ('show_nsfw',     'false'),
       ('theme',         'dark'),
-      ('is_premium',    'false'),
       ('currency',      'usd');
   `);
 

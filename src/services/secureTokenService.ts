@@ -1,8 +1,8 @@
 /**
- * secureTokenService — encrypted storage for platform OAuth tokens.
+ * secureTokenService — encrypted on-device storage for platform credentials.
  *
- * Uses expo-secure-store (Keychain on iOS, EncryptedSharedPreferences on Android).
- * Keys follow the convention: `{platform}_{tokenType}`.
+ * Currently holds only the user's own Steam Web API key. Uses expo-secure-store
+ * (Keychain on iOS, EncryptedSharedPreferences on Android). Nothing is uploaded.
  */
 
 import * as SecureStore from 'expo-secure-store';
@@ -28,26 +28,8 @@ export async function setToken(
 }
 
 export async function clearTokens(platform: ImportPlatform): Promise<void> {
-  const keys = ['access_token', 'refresh_token', 'token_expiry', 'session_cookies'];
+  const keys = ['api_key'];
   await Promise.all(
     keys.map((k) => SecureStore.deleteItemAsync(key(platform, k)).catch(() => {}))
   );
-}
-
-export async function isTokenExpired(platform: ImportPlatform): Promise<boolean> {
-  const expiry = await getToken(platform, 'token_expiry');
-  if (!expiry) return true;
-  return Date.now() >= Number(expiry);
-}
-
-export async function setTokenWithExpiry(
-  platform: ImportPlatform,
-  accessToken: string,
-  refreshToken: string,
-  expiresIn: number
-): Promise<void> {
-  await setToken(platform, 'access_token', accessToken);
-  await setToken(platform, 'refresh_token', refreshToken);
-  // Store expiry as unix ms, with 60s safety margin
-  await setToken(platform, 'token_expiry', String(Date.now() + (expiresIn - 60) * 1000));
 }

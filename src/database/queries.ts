@@ -295,7 +295,6 @@ export function getAllSettings(): AppSettings {
     default_sort: getSetting('default_sort') || 'priority',
     show_nsfw: getSetting('show_nsfw') === 'true',
     theme: (getSetting('theme') || 'dark') as AppSettings['theme'],
-    is_premium: getSetting('is_premium') === 'true',
     currency: (getSetting('currency') || 'usd') as 'usd' | 'mxn',
   };
 }

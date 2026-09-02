@@ -35,8 +35,6 @@ export interface Game {
   price_cents?: number | null;
   updated_at?: string | null;
   deleted_at?: string | null;
-  synced?: number;
-  remote_id?: string | null;
   summary?: string | null;
   release_year?: number | null;
   genre_names?: string | null;
@@ -97,7 +95,6 @@ export interface Recommendation {
   whyNot?: string;
   badges: string[];
   confidence: 'low' | 'medium' | 'high';
-  premiumLocked?: boolean;
   sessionsToFinish: number | null;
   daysWaiting: number;
 }
@@ -184,7 +181,6 @@ export interface AppSettings {
   show_nsfw: boolean;
   default_sort: string;
   theme: Theme;
-  is_premium: boolean;
   currency: 'usd' | 'mxn';
 }
 
@@ -229,54 +225,6 @@ export const PLATFORM_CONFIG: Record<ImportPlatform, PlatformConfig> = {
   epic: { label: 'Epic Games', icon: 'game-controller', color: '#0078f2' },
 };
 
-// ─── GOG Types ────────────────────────────────────────────────────────────────
-
-export interface GOGGame {
-  id: number;
-  title: string;
-  image: string;
-  url: string;
-  worksOn: { Windows: boolean; Mac: boolean; Linux: boolean };
-}
-
-export interface GOGProductsResponse {
-  page: number;
-  totalPages: number;
-  totalProducts: number;
-  products: GOGGame[];
-}
-
-export interface GOGTokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
-  user_id: string;
-}
-
-// ─── Epic Types ───────────────────────────────────────────────────────────────
-
-export interface EpicTokenResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_token: string;
-  refresh_expires: number;
-  account_id: string;
-  token_type: string;
-  displayName?: string;
-}
-
-export interface EpicGame {
-  appName: string;
-  catalogItemId: string;
-  namespace: string;
-  title: string;
-  productSlug?: string;
-  developer?: string;
-  metadata?: Record<string, any> | null;
-  keyImages: { type: string; url: string }[];
-}
-
 // ─── Multi-Platform Connection ────────────────────────────────────────────────
 
 export interface PlatformConnection {
@@ -286,23 +234,6 @@ export interface PlatformConnection {
   displayName?: string;
   gameCount?: number;
 }
-
-export interface PlatformImportResult {
-  platform: ImportPlatform;
-  imported: number;
-  skipped: number;
-  errors: string[];
-}
-
-// ─── AI Picker State Types ────────────────────────────────────────────────────
-
-export interface AiPreviewState {
-  count: number;
-  lastAt: string | null;
-  initialized: boolean;
-  preferenceEventsCount: number;
-}
-
 
 // ─── Manual Game Types ────────────────────────────────────────────────────────
 

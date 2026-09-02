@@ -1,7 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 import { getDatabase } from '../database/schema';
 
-// This is a mocked cloud backup. In a real application, this would sync with a backend server like Firebase or Supabase.
+// Local file backup. There is no server: export writes a JSON file the user keeps,
+// import reads one back. Nothing leaves the device unless the user shares the file.
 
 export const exportData = async (): Promise<string> => {
     try {

@@ -203,7 +203,7 @@ export function PickNextGameModal({ visible, recommendation, onReroll, onClose }
 
 const s = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {

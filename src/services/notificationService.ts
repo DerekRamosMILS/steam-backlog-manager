@@ -21,6 +21,8 @@ const CHALLENGE_REMINDER_DAY = 25;
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: false,
     shouldSetBadge: false,
   }),
@@ -116,7 +118,11 @@ export async function syncReminders(lang: Language): Promise<void> {
           .replace('{game}', stale.game.title)
           .replace('{days}', String(stale.idle)),
       },
-      trigger: { date: nextReminderDate(1), channelId: ANDROID_CHANNEL_ID },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: nextReminderDate(1),
+        channelId: ANDROID_CHANNEL_ID,
+      },
     });
   }
 
@@ -131,7 +137,11 @@ export async function syncReminders(lang: Language): Promise<void> {
           title: t('notif_challenge_title', lang),
           body: t('notif_challenge_body', lang).replace('{count}', String(openChallenges.length)),
         },
-        trigger: { date: reminderDay, channelId: ANDROID_CHANNEL_ID },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: reminderDay,
+          channelId: ANDROID_CHANNEL_ID,
+        },
       });
     }
   }

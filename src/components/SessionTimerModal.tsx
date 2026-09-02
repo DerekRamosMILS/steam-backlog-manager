@@ -104,7 +104,7 @@ export function SessionTimerModal({ visible, game, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleDiscard}>
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={() => {}} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
       <View style={s.root}>
         {/* Top bar */}

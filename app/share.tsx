@@ -146,9 +146,9 @@ export default function ShareProfileScreen() {
   const { language = 'en', playerName = 'Player' } = useAppContext() as any;
   const lang = language as Language;
   const { games, stats, loading, refresh } = useGames();
-  const profileRef = useRef<ViewShot>(null);
-  const shameRef = useRef<ViewShot>(null);
-  const libraryRef = useRef<ViewShot>(null);
+  const profileRef = useRef<React.ComponentRef<typeof ViewShot> | null>(null);
+  const shameRef = useRef<React.ComponentRef<typeof ViewShot> | null>(null);
+  const libraryRef = useRef<React.ComponentRef<typeof ViewShot> | null>(null);
   const [sharingProfile, setSharingProfile] = useState(false);
   const [sharingShame, setSharingShame] = useState(false);
   const [sharingLibrary, setSharingLibrary] = useState(false);
@@ -176,7 +176,7 @@ export default function ShareProfileScreen() {
     : null;
 
   const captureAndShare = async (
-    ref: React.RefObject<ViewShot>,
+    ref: React.RefObject<React.ComponentRef<typeof ViewShot> | null>,
     dialogTitle: string,
     onBusy: (v: boolean) => void,
   ) => {
@@ -222,7 +222,7 @@ export default function ShareProfileScreen() {
             {/* Hero cover strip */}
             <View style={s.heroStrip}>
               {mostPlayed?.cover_url ? (
-                <Image source={{ uri: mostPlayed.cover_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                <Image source={{ uri: mostPlayed.cover_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               ) : null}
               <View style={s.heroOverlay} />
               {/* App label */}
@@ -496,7 +496,7 @@ const s = StyleSheet.create({
     overflow: 'hidden', marginBottom: 14,
   },
   heroStrip: { height: 120, position: 'relative', overflow: 'hidden', backgroundColor: ED.surface2 },
-  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14,12,9,0.55)' },
+  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(14,12,9,0.55)' },
   appLabel: {
     position: 'absolute', top: 12, right: 14,
     paddingHorizontal: 8, paddingVertical: 3,

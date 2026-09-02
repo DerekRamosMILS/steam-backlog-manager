@@ -1,0 +1,10 @@
+name = "backlogflow-steam"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# STEAM_API_KEY is a secret, never a var. Set it with:
+#   wrangler secret put STEAM_API_KEY
+# It is your own Steam Web API key. It never reaches the app.
+
+[observability]
+enabled = true

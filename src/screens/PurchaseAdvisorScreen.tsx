@@ -113,7 +113,7 @@ const VERDICT_THEME: Record<VerdictLevel, {
 export default function PurchaseAdvisorScreen() {
   const { language, playerName = 'Player' } = useAppContext() as any;
   const router = useRouter();
-  const verdictRef = useRef<ViewShot>(null);
+  const verdictRef = useRef<React.ComponentRef<typeof ViewShot> | null>(null);
   const [step, setStep] = useState<Step>('search');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ManualGameSearchResult[]>([]);
@@ -444,7 +444,7 @@ export default function PurchaseAdvisorScreen() {
 function VerdictDisplay({ verdict, lang, verdictRef }: {
   verdict: VerdictData;
   lang: Language;
-  verdictRef: React.RefObject<ViewShot>;
+  verdictRef: React.RefObject<React.ComponentRef<typeof ViewShot> | null>;
 }) {
   const theme = VERDICT_THEME[verdict.level];
   const yearDelta = verdict.finishYearAfter - verdict.finishYearBefore;
@@ -452,7 +452,12 @@ function VerdictDisplay({ verdict, lang, verdictRef }: {
   return (
     <>
       {/* Capturable share card */}
-      <ViewShot ref={verdictRef} options={{ format: 'png', quality: 0.97 }}>
+      {/* react-native-view-shot still types ref as LegacyRef, which React 19's
+          nullable RefObject no longer satisfies. Narrow cast at the boundary. */}
+      <ViewShot
+        ref={verdictRef as React.RefObject<React.ComponentRef<typeof ViewShot>>}
+        options={{ format: 'png', quality: 0.97 }}
+      >
         <View style={[sc.card, { backgroundColor: theme.bg, borderColor: theme.border }]}>
           {/* Header */}
           <View style={sc.cardHeader}>

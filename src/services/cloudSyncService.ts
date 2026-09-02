@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getDatabase } from '../database/schema';
 
 // Local file backup. There is no server: export writes a JSON file the user keeps,

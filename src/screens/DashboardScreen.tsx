@@ -8,7 +8,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useGames } from '../hooks/useGames';
 import { useRecommendation } from '../hooks/useRecommendation';
 import { useAppContext } from '../hooks/useAppContext';
-import { getDailyPick, getRecommendations } from '../services/recommendationService';
+import { getDailyPick } from '../services/recommendationService';
 import { GameCover } from '../components/GameCover';
 import { PickNextGameModal } from '../components/PickNextGameModal';
 import { SessionTimerModal } from '../components/SessionTimerModal';
@@ -16,17 +16,16 @@ import { MonthlyChallenges } from '../components/MonthlyChallenges';
 import { getCurrentMonthChallenges } from '../services/challengeService';
 import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 import { t } from '../i18n';
-import { Game, Recommendation, DailyPick, BacklogChallenge } from '../types';
+import { Game, DailyPick, BacklogChallenge } from '../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { games, stats, refresh, setStatus, getByStatus } = useGames();
+  const { games, stats, refresh, getByStatus } = useGames();
   const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
   const { language, playerName } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [timerGame, setTimerGame] = useState<Game | null>(null);
-  const [topRecs, setTopRecs] = useState<Recommendation[]>([]);
   const [dailyPick, setDailyPick] = useState<DailyPick | null>(null);
   const [challenges, setChallenges] = useState<BacklogChallenge[]>([]);
 
@@ -35,7 +34,6 @@ export default function DashboardScreen() {
       refresh();
       refreshRec();
       setDailyPick(getDailyPick());
-      setTopRecs(getRecommendations({ limit: 3 }));
       setChallenges(getCurrentMonthChallenges());
     }, [refresh, refreshRec])
   );

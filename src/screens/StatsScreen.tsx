@@ -280,7 +280,6 @@ export default function InsightsScreen() {
               </View>
               <View style={edStyles.card}>
                 {DAILY_SCENARIOS.map((sc, idx) => {
-                  const sim = calculateCompletionTimeline(sc.h);
                   const isSelected = planHours === sc.h;
                   return (
                     <TouchableOpacity

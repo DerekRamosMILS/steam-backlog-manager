@@ -18,9 +18,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type PlatformMode = 'all' | GamePlatform;
 type SortMode = 'priority_high' | 'priority_low' | 'hltb_met' | 'shortest' | 'longest' | 'recently_played' | 'least_recently_played' | 'alphabetical_asc' | 'alphabetical_desc';
-type ShortMode = 'all' | 'under_5' | 'under_10';
 type ViewMode = 'grid' | 'list';
 
 function getFilterTabs(lang: Language): { key: GameStatus | 'all'; label: string; count?: number }[] {
@@ -55,7 +53,7 @@ function compareGames(a: Game, b: Game, mode: SortMode): number {
 export default function LibraryScreen() {
   const router = useRouter();
   const { language } = useAppContext();
-  const { games, stats, refresh, search, setStatus } = useGames();
+  const { games, stats, refresh, search } = useGames();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<GameStatus | 'all'>('all');
   const [sortMode, setSortMode] = useState<SortMode>('priority_high');
@@ -82,7 +80,6 @@ export default function LibraryScreen() {
   ];
 
   const renderGridItem = ({ item, index }: { item: Game; index: number }) => {
-    const sc = STATUS_COLORS[item.status];
     return (
       <TouchableOpacity
         style={styles.gridItem}
@@ -94,7 +91,7 @@ export default function LibraryScreen() {
           {item.status === 'playing' && (
             <View style={styles.playingBadge}>
               <View style={[styles.playingDot, { backgroundColor: ED.moss }]} />
-              <Text style={styles.playingBadgeText}>PLAYING</Text>
+              <Text style={styles.playingBadgeText}>{t('st_playing', language).toUpperCase()}</Text>
             </View>
           )}
           {item.status === 'completed' && (

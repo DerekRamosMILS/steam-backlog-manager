@@ -36,7 +36,7 @@ import { ED, edStyles, MONO_FONT } from '../styles/editorial';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { language = 'en', setLanguage, playerName, setPlayerName } = useAppContext() as any;
+  const { language = 'en', setLanguage, playerName } = useAppContext() as any;
   const [showTutorial, setShowTutorial] = useState(false);
   const [steamId, setSteamId] = useState('');
   const [apiKey, setApiKey] = useState('');
